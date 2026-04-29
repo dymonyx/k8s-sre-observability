@@ -1,0 +1,86 @@
+services:
+  frontend:
+    build:
+      context: .
+      args:
+        SERVICE: frontend
+    image: chainwise/frontend:local
+    environment:
+      PORT: "8080"
+      BIKE_API_URL: http://bike-api:8081
+    ports:
+      - "8080:8080"
+    depends_on:
+      - bike-api
+
+  bike-api:
+    build:
+      context: .
+      args:
+        SERVICE: bike-api
+    image: chainwise/bike-api:local
+    environment:
+      PORT: "8081"
+      MAINTENANCE_API_URL: http://maintenance-api:8082
+    ports:
+      - "8081:8081"
+    depends_on:
+      - maintenance-api
+
+  maintenance-api:
+    build:
+      context: .
+      args:
+        SERVICE: maintenance-api
+    image: chainwise/maintenance-api:local
+    environment:
+      PORT: "8082"
+      WEATHER_API_URL: http://weather-api:8083
+    ports:
+      - "8082:8082"
+    depends_on:
+      - weather-api
+
+  weather-api:
+    build:
+      context: .
+      args:
+        SERVICE: weather-api
+    image: chainwise/weather-api:local
+    environment:
+      PORT: "8083"
+      REMINDER_API_URL: http://reminder-api:8084
+      HTTP_TIMEOUT: 3s
+      WEATHER_CITY: "Vienna"
+      WEATHER_LATITUDE: "48.2082"
+      WEATHER_LONGITUDE: "16.3738"
+      DEMO_WEATHER: rainy
+    ports:
+      - "8083:8083"
+    depends_on:
+      - reminder-api
+
+  reminder-api:
+    build:
+      context: .
+      args:
+        SERVICE: reminder-api
+    image: chainwise/reminder-api:local
+    environment:
+      PORT: "8084"
+      USER_API_URL: http://user-api:8085
+    ports:
+      - "8084:8084"
+    depends_on:
+      - user-api
+
+  user-api:
+    build:
+      context: .
+      args:
+        SERVICE: user-api
+    image: chainwise/user-api:local
+    environment:
+      PORT: "8085"
+    ports:
+      - "8085:8085"

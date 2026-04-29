@@ -1,0 +1,9 @@
+.git
+bin
+coverage.out
+*.log
+.env
+.env.*
+.idea
+.vscode
+README.md

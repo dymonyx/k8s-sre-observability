@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Chainwise</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+
+  <body>
+    <main class="page">
+      <section class="app">
+        <header class="header">
+          <div>
+            <p class="eyebrow">Bike maintenance assistant</p>
+            <h1>Chainwise</h1>
+            <p class="subtitle">
+              Get bicycle maintenance recommendations based on your ride history, bike condition, and local weather.
+            </p>
+          </div>
+
+          <div class="status-card">
+            <span>Status</span>
+            <strong id="status">Ready</strong>
+          </div>
+        </header>
+
+        <section class="layout">
+          <form class="panel" id="bike-form">
+            <div class="panel-header">
+              <div>
+                <p class="section-label">Bike profile</p>
+                <h2>Your current bike</h2>
+              </div>
+              <button class="text-button" type="button" id="reset-button">Reset demo data</button>
+            </div>
+
+            <div class="form-grid">
+              <label>
+                Bike name
+                <input id="bike-name" name="bikeName" type="text" autocomplete="off">
+              </label>
+
+              <label>
+                Bike type
+                <select id="bike-type-input" name="bikeType">
+                  <option value="gravel bike">Gravel bike</option>
+                  <option value="road bike">Road bike</option>
+                  <option value="city bike">City bike</option>
+                  <option value="mountain bike">Mountain bike</option>
+                  <option value="hybrid bike">Hybrid bike</option>
+                </select>
+              </label>
+
+              <label>
+                Riding style
+                <select id="riding-style" name="ridingStyle">
+                  <option value="commute and weekend rides">Commute and weekend rides</option>
+                  <option value="daily commuting">Daily commuting</option>
+                  <option value="weekend rides">Weekend rides</option>
+                  <option value="sport training">Sport training</option>
+                  <option value="mixed riding">Mixed riding</option>
+                </select>
+              </label>
+
+              <label>
+                Current odometer, km
+                <input id="current-odometer" name="currentOdometerKm" type="number" min="0" step="1">
+              </label>
+
+              <label>
+                Last service at, km
+                <input id="last-service-odometer" name="lastServiceOdometerKm" type="number" min="0" step="1">
+              </label>
+
+              <label>
+                Last chain lube at, km
+                <input id="last-chain-lube-odometer" name="lastChainLubeOdometerKm" type="number" min="0" step="1">
+              </label>
+
+              <label>
+                Last ride date
+                <input id="last-ride-date" name="lastRideDate" type="date">
+              </label>
+
+              <label>
+                Last service date
+                <input id="last-service-date" name="lastServiceDate" type="date">
+              </label>
+
+              <label>
+                Chain condition
+                <select id="chain-condition-input" name="chainCondition">
+                  <option value="good">Good</option>
+                  <option value="slightly dry">Slightly dry</option>
+                  <option value="dirty">Dirty</option>
+                  <option value="worn">Worn</option>
+                </select>
+              </label>
+
+              <label>
+                Brake condition
+                <select id="brake-condition-input" name="brakeCondition">
+                  <option value="good">Good</option>
+                  <option value="check soon">Check soon</option>
+                  <option value="worn">Worn</option>
+                </select>
+              </label>
+
+              <label>
+                Tire condition
+                <select id="tire-condition-input" name="tireCondition">
+                  <option value="good">Good</option>
+                  <option value="low pressure">Low pressure</option>
+                  <option value="worn">Worn</option>
+                </select>
+              </label>
+            </div>
+          </form>
+
+          <aside class="panel ride-panel">
+            <p class="section-label">Add ride</p>
+            <h2>Log a new ride</h2>
+            <p class="helper">Add distance after each ride. Chainwise updates the odometer and uses it for maintenance checks.</p>
+
+            <label>
+              Ride distance, km
+              <input id="ride-distance" type="number" min="1" step="1" placeholder="32">
+            </label>
+
+            <button class="secondary-button" id="add-ride-button" type="button">Add ride</button>
+            <button class="primary-button" id="check-button" type="button">Get recommendation</button>
+          </aside>
+        </section>
+
+        <section class="result-block">
+          <div class="result-header">
+            <div>
+              <p class="section-label">Recommendation</p>
+              <h2 id="title">No check yet</h2>
+            </div>
+            <strong class="priority-badge" id="priority">Waiting</strong>
+          </div>
+
+          <p class="result-summary" id="summary">Fill in your bike profile or use the demo data, then get a recommendation.</p>
+
+          <div class="overview">
+            <article class="info-card">
+              <span>Bike</span>
+              <strong id="bike-name-result">—</strong>
+              <div class="row"><span>Type</span><b id="bike-type-result">—</b></div>
+              <div class="row"><span>Odometer</span><b id="odometer-result">—</b></div>
+              <div class="row"><span>Since chain lube</span><b id="since-lube-result">—</b></div>
+              <div class="row"><span>Since service</span><b id="since-service-result">—</b></div>
+            </article>
+
+            <article class="info-card">
+              <span>Weather</span>
+              <strong id="city">—</strong>
+              <div class="row"><span>Condition</span><b id="condition">—</b></div>
+              <div class="row"><span>Weather risk</span><b id="weather-risk">—</b></div>
+              <div class="row"><span>Source</span><b id="weather-source">—</b></div>
+            </article>
+
+            <article class="info-card">
+              <span>Reminder</span>
+              <strong id="reminder-priority">—</strong>
+              <div class="row"><span>Type</span><b id="reminder-type">—</b></div>
+              <div class="row"><span>Date</span><b id="next-date">—</b></div>
+              <div class="row"><span>Channel</span><b id="channel">—</b></div>
+            </article>
+          </div>
+
+          <div class="message" id="reason">No recommendation has been calculated yet.</div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

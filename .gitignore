@@ -1,0 +1,12 @@
+bin/
+dist/
+tmp/
+*.log
+
+.env
+.env.*
+
+.DS_Store
+.vscode/
+
+coverage.out
