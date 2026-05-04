@@ -51,9 +51,9 @@ services:
       PORT: "8083"
       REMINDER_API_URL: http://reminder-api:8084
       HTTP_TIMEOUT: 3s
-      WEATHER_CITY: "Vienna"
-      WEATHER_LATITUDE: "48.2082"
-      WEATHER_LONGITUDE: "16.3738"
+      WEATHER_CITY: "Saint Petersburg"
+      WEATHER_LATITUDE: "59.9311"
+      WEATHER_LONGITUDE: "30.3609"
       DEMO_WEATHER: rainy
     ports:
       - "8083:8083"
