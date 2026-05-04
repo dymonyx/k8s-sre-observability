@@ -651,3 +651,32 @@ button:disabled {
 .ride-actions .primary-button {
   margin-top: 0;
 }
+
+/* Final top cards alignment */
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 16px;
+  align-items: start;
+}
+
+.profile-panel {
+  min-height: 410px;
+  box-sizing: border-box;
+}
+
+.ride-panel {
+  height: 410px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-self: start;
+}
+
+.ride-actions {
+  margin-top: auto;
+  display: grid;
+  gap: 12px;
+  padding-top: 22px;
+}
