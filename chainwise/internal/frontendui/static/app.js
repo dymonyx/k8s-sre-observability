@@ -1,5 +1,7 @@
 const STORAGE_KEY = "chainwise.profile.v3";
 
+let rideDateViewDate = null;
+
 const defaultProfile = {
   bikeName: "My Gravel Bike",
   bikeType: "gravel bike",
@@ -56,6 +58,7 @@ const gearList = document.getElementById("gear-list");
 
 loadProfile();
 initCustomSelects();
+initRideDatePicker();
 loadCheck();
 
 Object.values(fields).forEach((field) => {
@@ -169,6 +172,7 @@ function addRide() {
   saveProfile(profile);
   setFormProfile(profile);
   rideDateInput.value = today();
+  syncRideDatePicker();
   loadCheck();
 }
 
@@ -511,4 +515,178 @@ function closeCustomSelects() {
       trigger.setAttribute("aria-expanded", "false");
     }
   });
+}
+
+function initRideDatePicker() {
+  const picker = document.getElementById("ride-date-picker");
+  const trigger = document.getElementById("ride-date-trigger");
+  const prev = document.getElementById("ride-date-prev");
+  const next = document.getElementById("ride-date-next");
+  const todayButton = document.getElementById("ride-date-today");
+
+  if (!picker || !trigger || !rideDateInput) {
+    return;
+  }
+
+  if (!rideDateInput.value) {
+    rideDateInput.value = today();
+  }
+
+  rideDateViewDate = parseISODate(rideDateInput.value) || new Date();
+
+  trigger.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const isOpen = picker.classList.contains("is-open");
+    closeRideDatePicker();
+
+    if (!isOpen) {
+      picker.classList.add("is-open");
+      renderRideDatePicker();
+    }
+  });
+
+  prev.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    rideDateViewDate.setMonth(rideDateViewDate.getMonth() - 1);
+    renderRideDatePicker();
+  });
+
+  next.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    rideDateViewDate.setMonth(rideDateViewDate.getMonth() + 1);
+    renderRideDatePicker();
+  });
+
+  todayButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    setRideDate(today());
+    closeRideDatePicker();
+  });
+
+  document.addEventListener("click", () => {
+    closeRideDatePicker();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeRideDatePicker();
+    }
+  });
+
+  syncRideDatePicker();
+}
+
+function renderRideDatePicker() {
+  const monthLabel = document.getElementById("ride-date-month");
+  const grid = document.getElementById("ride-date-grid");
+
+  if (!monthLabel || !grid || !rideDateViewDate) {
+    return;
+  }
+
+  const year = rideDateViewDate.getFullYear();
+  const month = rideDateViewDate.getMonth();
+
+  monthLabel.textContent = rideDateViewDate.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric"
+  });
+
+  grid.innerHTML = "";
+
+  const firstDay = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const leadingEmptyDays = (firstDay.getDay() + 6) % 7;
+  const selected = rideDateInput.value;
+
+  for (let i = 0; i < leadingEmptyDays; i++) {
+    const empty = document.createElement("span");
+    empty.className = "cw-date-empty";
+    grid.appendChild(empty);
+  }
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(year, month, day);
+    const value = formatISODate(date);
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "cw-date-day";
+    button.textContent = String(day);
+
+    if (value === selected) {
+      button.classList.add("active");
+    }
+
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      setRideDate(value);
+      closeRideDatePicker();
+    });
+
+    grid.appendChild(button);
+  }
+}
+
+function setRideDate(value) {
+  rideDateInput.value = value;
+  rideDateInput.dispatchEvent(new Event("change", { bubbles: true }));
+  syncRideDatePicker();
+}
+
+function syncRideDatePicker() {
+  const trigger = document.getElementById("ride-date-trigger");
+
+  if (!trigger || !rideDateInput) {
+    return;
+  }
+
+  if (!rideDateInput.value) {
+    rideDateInput.value = today();
+  }
+
+  trigger.textContent = rideDateInput.value;
+  rideDateViewDate = parseISODate(rideDateInput.value) || new Date();
+
+  renderRideDatePicker();
+}
+
+function closeRideDatePicker() {
+  const picker = document.getElementById("ride-date-picker");
+
+  if (picker) {
+    picker.classList.remove("is-open");
+  }
+}
+
+function parseISODate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+
+  if (!match) {
+    return null;
+  }
+
+  return new Date(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3])
+  );
+}
+
+function formatISODate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
 }

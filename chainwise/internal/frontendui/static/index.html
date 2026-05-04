@@ -187,9 +187,39 @@
               <input id="ride-distance" type="number" min="0" step="1">
             </label>
 
-            <label>
+            <label class="date-field">
               <span>Ride date</span>
-              <input id="ride-date" type="date">
+              <input id="ride-date" type="hidden">
+
+              <div class="cw-date" id="ride-date-picker">
+                <button class="cw-date-trigger" id="ride-date-trigger" type="button">
+                  —
+                </button>
+
+                <div class="cw-date-popover" id="ride-date-popover">
+                  <div class="cw-date-header">
+                    <button type="button" id="ride-date-prev">‹</button>
+                    <strong id="ride-date-month">Month</strong>
+                    <button type="button" id="ride-date-next">›</button>
+                  </div>
+
+                  <div class="cw-date-weekdays">
+                    <span>Mon</span>
+                    <span>Tue</span>
+                    <span>Wed</span>
+                    <span>Thu</span>
+                    <span>Fri</span>
+                    <span>Sat</span>
+                    <span>Sun</span>
+                  </div>
+
+                  <div class="cw-date-grid" id="ride-date-grid"></div>
+
+                  <button class="cw-date-today" type="button" id="ride-date-today">
+                    Today
+                  </button>
+                </div>
+              </div>
             </label>
           </div>
 
