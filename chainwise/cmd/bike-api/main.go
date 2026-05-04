@@ -97,12 +97,12 @@ func checkHandler(client *httpx.Client, logger *slog.Logger) http.HandlerFunc {
 }
 
 func bikeProfileFromQuery(query url.Values) model.BikeProfile {
-	currentOdometer := parseNonNegativeInt(query.Get("currentOdometerKm"), 1240)
-	lastServiceOdometer := parseNonNegativeInt(query.Get("lastServiceOdometerKm"), max(0, currentOdometer-260))
-	lastChainLubeOdometer := parseNonNegativeInt(query.Get("lastChainLubeOdometerKm"), max(0, currentOdometer-80))
-	lastChainReplacementOdometer := parseNonNegativeInt(query.Get("lastChainReplacementOdometerKm"), max(0, currentOdometer-900))
-	lastBrakeCheckOdometer := parseNonNegativeInt(query.Get("lastBrakeCheckOdometerKm"), max(0, currentOdometer-300))
-	lastTireCheckOdometer := parseNonNegativeInt(query.Get("lastTireCheckOdometerKm"), max(0, currentOdometer-120))
+	currentOdometer := parseNonNegativeInt(query.Get("currentOdometerKm"), 0)
+	lastServiceOdometer := parseNonNegativeInt(query.Get("lastServiceOdometerKm"), 0)
+	lastChainLubeOdometer := parseNonNegativeInt(query.Get("lastChainLubeOdometerKm"), 0)
+	lastChainReplacementOdometer := parseNonNegativeInt(query.Get("lastChainReplacementOdometerKm"), 0)
+	lastBrakeCheckOdometer := parseNonNegativeInt(query.Get("lastBrakeCheckOdometerKm"), 0)
+	lastTireCheckOdometer := parseNonNegativeInt(query.Get("lastTireCheckOdometerKm"), 0)
 
 	lastServiceOdometer = clampMax(lastServiceOdometer, currentOdometer)
 	lastChainLubeOdometer = clampMax(lastChainLubeOdometer, currentOdometer)
