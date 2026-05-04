@@ -68,10 +68,19 @@ func checkHandler(client *httpx.Client, logger *slog.Logger) http.HandlerFunc {
 		query.Set("lastServiceDate", profile.LastServiceDate)
 		query.Set("lastServiceOdometerKm", strconv.Itoa(profile.LastServiceOdometerKM))
 		query.Set("lastChainLubeOdometerKm", strconv.Itoa(profile.LastChainLubeOdometerKM))
+		query.Set("lastChainReplacementOdometerKm", strconv.Itoa(profile.LastChainReplacementOdometerKM))
+		query.Set("lastBrakeCheckOdometerKm", strconv.Itoa(profile.LastBrakeCheckOdometerKM))
+		query.Set("lastTireCheckOdometerKm", strconv.Itoa(profile.LastTireCheckOdometerKM))
 		query.Set("ridingStyle", profile.RidingStyle)
 		query.Set("chainCondition", profile.ChainCondition)
+		query.Set("chainWear", profile.ChainWear)
 		query.Set("brakeCondition", profile.BrakeCondition)
+		query.Set("brakePadThickness", profile.BrakePadThickness)
+		query.Set("brakeSymptoms", profile.BrakeSymptoms)
 		query.Set("tireCondition", profile.TireCondition)
+		query.Set("recentPunctures", strconv.Itoa(profile.RecentPunctures))
+		query.Set("frontTirePressureBar", formatFloat(profile.FrontTirePressureBar))
+		query.Set("rearTirePressureBar", formatFloat(profile.RearTirePressureBar))
 
 		var recommendation model.MaintenanceRecommendation
 		if err := client.GetJSON(r.Context(), "/maintenance/recommendation", query, &recommendation); err != nil {
@@ -89,30 +98,41 @@ func checkHandler(client *httpx.Client, logger *slog.Logger) http.HandlerFunc {
 
 func bikeProfileFromQuery(query url.Values) model.BikeProfile {
 	currentOdometer := parseNonNegativeInt(query.Get("currentOdometerKm"), 1240)
-	lastServiceOdometer := parseNonNegativeInt(query.Get("lastServiceOdometerKm"), 980)
-	lastChainLubeOdometer := parseNonNegativeInt(query.Get("lastChainLubeOdometerKm"), 1160)
+	lastServiceOdometer := parseNonNegativeInt(query.Get("lastServiceOdometerKm"), max(0, currentOdometer-260))
+	lastChainLubeOdometer := parseNonNegativeInt(query.Get("lastChainLubeOdometerKm"), max(0, currentOdometer-80))
+	lastChainReplacementOdometer := parseNonNegativeInt(query.Get("lastChainReplacementOdometerKm"), max(0, currentOdometer-900))
+	lastBrakeCheckOdometer := parseNonNegativeInt(query.Get("lastBrakeCheckOdometerKm"), max(0, currentOdometer-300))
+	lastTireCheckOdometer := parseNonNegativeInt(query.Get("lastTireCheckOdometerKm"), max(0, currentOdometer-120))
 
-	if lastServiceOdometer > currentOdometer {
-		lastServiceOdometer = currentOdometer
-	}
-	if lastChainLubeOdometer > currentOdometer {
-		lastChainLubeOdometer = currentOdometer
-	}
+	lastServiceOdometer = clampMax(lastServiceOdometer, currentOdometer)
+	lastChainLubeOdometer = clampMax(lastChainLubeOdometer, currentOdometer)
+	lastChainReplacementOdometer = clampMax(lastChainReplacementOdometer, currentOdometer)
+	lastBrakeCheckOdometer = clampMax(lastBrakeCheckOdometer, currentOdometer)
+	lastTireCheckOdometer = clampMax(lastTireCheckOdometer, currentOdometer)
 
 	return model.BikeProfile{
-		ID:                      "bike-demo-001",
-		Name:                    firstNonEmpty(query.Get("bikeName"), "My Gravel Bike"),
-		Type:                    firstNonEmpty(query.Get("bikeType"), "gravel bike"),
-		CurrentOdometerKM:       currentOdometer,
-		LastRideDistanceKM:      parseNonNegativeInt(query.Get("lastRideDistanceKm"), 0),
-		LastRideDate:            firstNonEmpty(query.Get("lastRideDate"), time.Now().UTC().Format(time.DateOnly)),
-		LastServiceDate:         firstNonEmpty(query.Get("lastServiceDate"), time.Now().UTC().AddDate(0, 0, -18).Format(time.DateOnly)),
-		LastServiceOdometerKM:   lastServiceOdometer,
-		LastChainLubeOdometerKM: lastChainLubeOdometer,
-		RidingStyle:             firstNonEmpty(query.Get("ridingStyle"), "commute and weekend rides"),
-		ChainCondition:          firstNonEmpty(query.Get("chainCondition"), "slightly dry"),
-		BrakeCondition:          firstNonEmpty(query.Get("brakeCondition"), "good"),
-		TireCondition:           firstNonEmpty(query.Get("tireCondition"), "good"),
+		ID:                             "bike-demo-001",
+		Name:                           firstNonEmpty(query.Get("bikeName"), "My Gravel Bike"),
+		Type:                           firstNonEmpty(query.Get("bikeType"), "gravel bike"),
+		CurrentOdometerKM:              currentOdometer,
+		LastRideDistanceKM:             parseNonNegativeInt(query.Get("lastRideDistanceKm"), 0),
+		LastRideDate:                   firstNonEmpty(query.Get("lastRideDate"), time.Now().UTC().Format(time.DateOnly)),
+		LastServiceDate:                firstNonEmpty(query.Get("lastServiceDate"), time.Now().UTC().AddDate(0, 0, -18).Format(time.DateOnly)),
+		LastServiceOdometerKM:          lastServiceOdometer,
+		LastChainLubeOdometerKM:        lastChainLubeOdometer,
+		LastChainReplacementOdometerKM: lastChainReplacementOdometer,
+		LastBrakeCheckOdometerKM:       lastBrakeCheckOdometer,
+		LastTireCheckOdometerKM:        lastTireCheckOdometer,
+		RidingStyle:                    firstNonEmpty(query.Get("ridingStyle"), "daily commuting"),
+		ChainCondition:                 firstNonEmpty(query.Get("chainCondition"), "unknown"),
+		ChainWear:                      firstNonEmpty(query.Get("chainWear"), "unknown"),
+		BrakeCondition:                 firstNonEmpty(query.Get("brakeCondition"), "unknown"),
+		BrakePadThickness:              firstNonEmpty(query.Get("brakePadThickness"), "unknown"),
+		BrakeSymptoms:                  firstNonEmpty(query.Get("brakeSymptoms"), "none"),
+		TireCondition:                  firstNonEmpty(query.Get("tireCondition"), "unknown"),
+		RecentPunctures:                parseNonNegativeInt(query.Get("recentPunctures"), 0),
+		FrontTirePressureBar:           parseNonNegativeFloat(query.Get("frontTirePressureBar"), 0),
+		RearTirePressureBar:            parseNonNegativeFloat(query.Get("rearTirePressureBar"), 0),
 	}
 }
 
@@ -124,9 +144,35 @@ func parseNonNegativeInt(value string, fallback int) int {
 	return parsed
 }
 
+func parseNonNegativeFloat(value string, fallback float64) float64 {
+	parsed, err := strconv.ParseFloat(value, 64)
+	if err != nil || parsed < 0 {
+		return fallback
+	}
+	return parsed
+}
+
+func formatFloat(value float64) string {
+	return strconv.FormatFloat(value, 'f', -1, 64)
+}
+
 func firstNonEmpty(value string, fallback string) string {
 	if value == "" {
 		return fallback
 	}
 	return value
+}
+
+func clampMax(value int, maximum int) int {
+	if value > maximum {
+		return maximum
+	}
+	return value
+}
+
+func max(a int, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }

@@ -27,12 +27,15 @@ type weatherService struct {
 
 type openMeteoResponse struct {
 	Current struct {
-		TemperatureC    float64 `json:"temperature_2m"`
-		Humidity        int     `json:"relative_humidity_2m"`
-		PrecipitationMM float64 `json:"precipitation"`
-		RainMM          float64 `json:"rain"`
-		SnowfallCM      float64 `json:"snowfall"`
-		WeatherCode     int     `json:"weather_code"`
+		TemperatureC         float64 `json:"temperature_2m"`
+		ApparentTemperatureC float64 `json:"apparent_temperature"`
+		Humidity             int     `json:"relative_humidity_2m"`
+		PrecipitationMM      float64 `json:"precipitation"`
+		RainMM               float64 `json:"rain"`
+		SnowfallCM           float64 `json:"snowfall"`
+		WeatherCode          int     `json:"weather_code"`
+		WindSpeedMS          float64 `json:"wind_speed_10m"`
+		WindGustsMS          float64 `json:"wind_gusts_10m"`
 	} `json:"current"`
 }
 
@@ -42,7 +45,6 @@ func main() {
 	metrics := observability.New(cfg.ServiceName)
 
 	reminderClient := httpx.NewClient(cfg.ReminderAPIURL, cfg.HTTPTimeout, logger)
-
 	weatherClient := &weatherService{
 		client: &http.Client{
 			Timeout: cfg.HTTPTimeout,
@@ -132,7 +134,8 @@ func (s *weatherService) currentWeather(ctx context.Context) (model.WeatherCurre
 	query := endpoint.Query()
 	query.Set("latitude", fmt.Sprintf("%.4f", s.latitude))
 	query.Set("longitude", fmt.Sprintf("%.4f", s.longitude))
-	query.Set("current", "temperature_2m,relative_humidity_2m,precipitation,rain,snowfall,weather_code")
+	query.Set("current", "temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,rain,snowfall,weather_code,wind_speed_10m,wind_gusts_10m")
+	query.Set("wind_speed_unit", "ms")
 	query.Set("timezone", "auto")
 	endpoint.RawQuery = query.Encode()
 
@@ -144,18 +147,24 @@ func (s *weatherService) currentWeather(ctx context.Context) (model.WeatherCurre
 	current := response.Current
 	condition := conditionFromWeather(current.WeatherCode, current.RainMM, current.SnowfallCM)
 
-	return model.WeatherCurrent{
-		City:            s.city,
-		Condition:       condition,
-		TemperatureC:    current.TemperatureC,
-		Rain:            current.RainMM > 0 || current.PrecipitationMM > 0,
-		Snow:            current.SnowfallCM > 0,
-		Humidity:        current.Humidity,
-		PrecipitationMM: current.PrecipitationMM,
-		WeatherCode:     current.WeatherCode,
-		RoadSalt:        current.SnowfallCM > 0,
-		Source:          "open-meteo",
-	}, nil
+	weather := model.WeatherCurrent{
+		City:                 s.city,
+		Condition:            condition,
+		TemperatureC:         current.TemperatureC,
+		ApparentTemperatureC: current.ApparentTemperatureC,
+		Rain:                 current.RainMM > 0 || current.PrecipitationMM > 0,
+		Snow:                 current.SnowfallCM > 0,
+		Humidity:             current.Humidity,
+		PrecipitationMM:      current.PrecipitationMM,
+		WeatherCode:          current.WeatherCode,
+		WindSpeedMS:          current.WindSpeedMS,
+		WindGustsMS:          current.WindGustsMS,
+		RoadSalt:             current.SnowfallCM > 0 || current.ApparentTemperatureC <= 0 && current.PrecipitationMM > 0,
+		Source:               "open-meteo",
+	}
+	weather.RideAdvice = rideAdviceFromWeather(weather)
+
+	return weather, nil
 }
 
 func getJSON(ctx context.Context, client *http.Client, endpoint string, target any) error {
@@ -186,12 +195,12 @@ func conditionFromWeather(code int, rainMM float64, snowfallCM float64) string {
 		return "snowy"
 	}
 
-	if rainMM > 0 || code >= 51 && code <= 67 || code >= 80 && code <= 82 {
-		return "rainy"
-	}
-
 	if code >= 95 {
 		return "stormy"
+	}
+
+	if rainMM > 0 || code >= 51 && code <= 67 || code >= 80 && code <= 82 {
+		return "rainy"
 	}
 
 	if code >= 45 && code <= 48 {
@@ -202,48 +211,134 @@ func conditionFromWeather(code int, rainMM float64, snowfallCM float64) string {
 }
 
 func (s *weatherService) fallbackWeather() model.WeatherCurrent {
-	return model.WeatherCurrent{
-		City:            s.city,
-		Condition:       "rainy",
-		TemperatureC:    12.0,
-		Rain:            true,
-		Snow:            false,
-		Humidity:        76,
-		PrecipitationMM: 1.2,
-		WeatherCode:     61,
-		RoadSalt:        false,
-		Source:          "fallback",
+	weather := model.WeatherCurrent{
+		City:                 s.city,
+		Condition:            "rainy",
+		TemperatureC:         12.0,
+		ApparentTemperatureC: 9.0,
+		Rain:                 true,
+		Snow:                 false,
+		Humidity:             76,
+		PrecipitationMM:      1.2,
+		WeatherCode:          61,
+		WindSpeedMS:          5.5,
+		WindGustsMS:          9.0,
+		RoadSalt:             false,
+		Source:               "fallback",
 	}
+	weather.RideAdvice = rideAdviceFromWeather(weather)
+	return weather
 }
 
 func riskFromWeather(weather model.WeatherCurrent) model.WeatherRisk {
-	if weather.Snow || weather.RoadSalt || weather.Condition == "stormy" {
-		return model.WeatherRisk{
-			City:      weather.City,
-			Condition: weather.Condition,
-			Risk:      "high",
-			Reason:    "snow, storms or road salt increase corrosion and drivetrain wear",
-			Source:    weather.Source,
-		}
+	risk := model.WeatherRisk{
+		City:                 weather.City,
+		Condition:            weather.Condition,
+		Source:               weather.Source,
+		TemperatureC:         weather.TemperatureC,
+		ApparentTemperatureC: weather.ApparentTemperatureC,
+		PrecipitationMM:      weather.PrecipitationMM,
+		WindSpeedMS:          weather.WindSpeedMS,
+		WindGustsMS:          weather.WindGustsMS,
+		RideAdvice:           weather.RideAdvice,
+	}
+
+	if weather.Snow || weather.RoadSalt || weather.Condition == "stormy" || weather.PrecipitationMM >= 4 {
+		risk.Risk = "high"
+		risk.Reason = "snow, storms, road salt or heavy rain increase corrosion and drivetrain wear"
+		return risk
 	}
 
 	if weather.Rain || weather.PrecipitationMM > 0 || weather.Humidity >= 75 {
-		return model.WeatherRisk{
-			City:      weather.City,
-			Condition: weather.Condition,
-			Risk:      "medium",
-			Reason:    "wet conditions increase the need for chain lubrication",
-			Source:    weather.Source,
+		risk.Risk = "medium"
+		risk.Reason = "wet or humid conditions increase the need for chain lubrication"
+		return risk
+	}
+
+	risk.Risk = "low"
+	risk.Reason = "dry weather keeps the normal maintenance interval"
+	return risk
+}
+
+func rideAdviceFromWeather(weather model.WeatherCurrent) model.RideAdvice {
+	gear := make([]string, 0, 5)
+	afterRide := make([]string, 0, 3)
+
+	if weather.ApparentTemperatureC <= 3 {
+		gear = append(gear, "warm gloves")
+	} else if weather.ApparentTemperatureC <= 10 || weather.WindSpeedMS >= 7 {
+		gear = append(gear, "full-finger gloves")
+	}
+
+	if weather.WindSpeedMS >= 7 || weather.WindGustsMS >= 10 {
+		gear = append(gear, "windproof layer")
+	}
+
+	if weather.Rain || weather.Snow || weather.PrecipitationMM > 0 {
+		gear = append(gear, "waterproof jacket")
+		gear = append(gear, "bike lights")
+		afterRide = append(afterRide, "wipe the drivetrain after the ride")
+		afterRide = append(afterRide, "lubricate the chain if it got wet")
+	}
+
+	if weather.Condition == "foggy" || weather.Condition == "stormy" {
+		gear = append(gear, "bike lights")
+	}
+
+	if weather.RoadSalt {
+		afterRide = append(afterRide, "rinse road salt from the drivetrain")
+	}
+
+	if len(gear) == 0 {
+		gear = append(gear, "standard helmet")
+	}
+
+	if weather.Condition == "stormy" || weather.Snow || weather.WindGustsMS >= 17 || weather.WindSpeedMS >= 14 || weather.ApparentTemperatureC <= -5 {
+		return model.RideAdvice{
+			Status:    "not_recommended",
+			Title:     "Ride not recommended",
+			Message:   "Current weather can make handling, braking or visibility unsafe. Consider postponing the ride.",
+			CanRide:   false,
+			Gear:      uniqueStrings(gear),
+			AfterRide: uniqueStrings(afterRide),
 		}
 	}
 
-	return model.WeatherRisk{
-		City:      weather.City,
-		Condition: weather.Condition,
-		Risk:      "low",
-		Reason:    "dry weather keeps the normal maintenance interval",
-		Source:    weather.Source,
+	if weather.Rain || weather.PrecipitationMM > 0 || weather.WindGustsMS >= 10 || weather.WindSpeedMS >= 9 || weather.ApparentTemperatureC <= 8 || weather.Condition == "foggy" {
+		return model.RideAdvice{
+			Status:    "caution",
+			Title:     "Ride with caution",
+			Message:   "Weather can affect braking distance, grip and bike handling. Slow down and choose a safer route.",
+			CanRide:   true,
+			Gear:      uniqueStrings(gear),
+			AfterRide: uniqueStrings(afterRide),
+		}
 	}
+
+	return model.RideAdvice{
+		Status:    "good",
+		Title:     "Good riding conditions",
+		Message:   "Weather looks suitable for a normal ride. Do a quick tire, brake and chain check before leaving.",
+		CanRide:   true,
+		Gear:      uniqueStrings(gear),
+		AfterRide: uniqueStrings(afterRide),
+	}
+}
+
+func uniqueStrings(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	return result
 }
 
 func firstNonEmpty(value string, fallback string) string {

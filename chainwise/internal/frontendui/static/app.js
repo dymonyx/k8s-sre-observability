@@ -1,67 +1,221 @@
-const storageKey = "chainwise-bike-profile-v2";
+const STORAGE_KEY = "chainwise.profile.v3";
 
 const defaultProfile = {
   bikeName: "My Gravel Bike",
   bikeType: "gravel bike",
-  ridingStyle: "commute and weekend rides",
+  ridingStyle: "daily commuting",
   currentOdometerKm: 1240,
   lastRideDistanceKm: 0,
-  lastRideDate: todayISO(),
-  lastServiceDate: "2026-04-11",
+  lastRideDate: today(),
+  lastServiceDate: daysAgo(18),
   lastServiceOdometerKm: 980,
   lastChainLubeOdometerKm: 1160,
-  chainCondition: "slightly dry",
-  brakeCondition: "good",
-  tireCondition: "good"
+  lastChainReplacementOdometerKm: 340,
+  lastBrakeCheckOdometerKm: 940,
+  lastTireCheckOdometerKm: 1120,
+  chainCondition: "unknown",
+  chainWear: "unknown",
+  brakeCondition: "unknown",
+  brakePadThickness: "unknown",
+  brakeSymptoms: "none",
+  tireCondition: "unknown",
+  recentPunctures: 0,
+  frontTirePressureBar: "",
+  rearTirePressureBar: ""
 };
 
 const fields = {
   bikeName: document.getElementById("bike-name"),
-  bikeType: document.getElementById("bike-type-input"),
+  bikeType: document.getElementById("bike-type"),
   ridingStyle: document.getElementById("riding-style"),
   currentOdometerKm: document.getElementById("current-odometer"),
   lastRideDate: document.getElementById("last-ride-date"),
   lastServiceDate: document.getElementById("last-service-date"),
   lastServiceOdometerKm: document.getElementById("last-service-odometer"),
   lastChainLubeOdometerKm: document.getElementById("last-chain-lube-odometer"),
-  chainCondition: document.getElementById("chain-condition-input"),
-  brakeCondition: document.getElementById("brake-condition-input"),
-  tireCondition: document.getElementById("tire-condition-input")
+  lastChainReplacementOdometerKm: document.getElementById("last-chain-replacement-odometer"),
+  chainCondition: document.getElementById("chain-condition"),
+  chainWear: document.getElementById("chain-wear"),
+  brakeSymptoms: document.getElementById("brake-symptoms"),
+  brakePadThickness: document.getElementById("brake-pad-thickness"),
+  tireCondition: document.getElementById("tire-condition"),
+  recentPunctures: document.getElementById("recent-punctures"),
+  frontTirePressureBar: document.getElementById("front-tire-pressure"),
+  rearTirePressureBar: document.getElementById("rear-tire-pressure")
 };
 
+const rideDateInput = document.getElementById("ride-date");
+const rideDistanceInput = document.getElementById("ride-distance");
 const checkButton = document.getElementById("check-button");
 const addRideButton = document.getElementById("add-ride-button");
 const resetButton = document.getElementById("reset-button");
+const forecastList = document.getElementById("forecast-list");
+const gearList = document.getElementById("gear-list");
 
+loadProfile();
+initCustomSelects();
+loadCheck();
+
+Object.values(fields).forEach((field) => {
+  field.addEventListener("input", handleProfileChange);
+  field.addEventListener("change", handleProfileChange);
+  field.addEventListener("keydown", handleProfileEnter);
+});
+
+function handleProfileChange() {
+  saveProfile(readProfile());
+  syncCustomSelects();
+}
+
+function handleProfileEnter(event) {
+  if (event.key !== "Enter") {
+    return;
+  }
+
+  event.preventDefault();
+  saveProfile(readProfile());
+  loadCheck();
+}
 checkButton.addEventListener("click", loadCheck);
 addRideButton.addEventListener("click", addRide);
 resetButton.addEventListener("click", resetDemoData);
 
-Object.values(fields).forEach((field) => {
-  field.addEventListener("change", saveProfileFromForm);
-});
+rideDistanceInput.addEventListener("keydown", handleRideEnter);
+rideDateInput.addEventListener("keydown", handleRideEnter);
 
-loadProfileToForm();
-loadCheck();
-
-function addRide() {
-  const rideDistanceInput = document.getElementById("ride-distance");
-  const rideDistance = numberOrZero(rideDistanceInput.value);
-
-  if (rideDistance <= 0) {
-    setStatus("Enter ride km");
+function handleRideEnter(event) {
+  if (event.key !== "Enter") {
     return;
   }
 
-  const profile = getProfileFromForm();
-  profile.currentOdometerKm += rideDistance;
-  profile.lastRideDistanceKm = rideDistance;
-  profile.lastRideDate = todayISO();
+  event.preventDefault();
+  addRide();
+}
+
+document.querySelectorAll("[data-action]").forEach((button) => {
+  button.addEventListener("click", () => quickAction(button.dataset.action));
+});
+
+function loadProfile() {
+  const profile = getStoredProfile();
+  setFormProfile(profile);
+  rideDistanceInput.value = "0";
+  rideDateInput.value = today();
+}
+
+function getStoredProfile() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      return { ...defaultProfile };
+    }
+    return { ...defaultProfile, ...JSON.parse(raw) };
+  } catch (_error) {
+    return { ...defaultProfile };
+  }
+}
+
+function setFormProfile(profile) {
+  Object.entries(fields).forEach(([key, field]) => {
+    field.value = profile[key] ?? defaultProfile[key] ?? "";
+    setText("last-ride-date-display", profile.lastRideDate || "—");
+  });
+  syncCustomSelects();
+}
+
+function readProfile() {
+  return {
+    bikeName: fields.bikeName.value.trim() || defaultProfile.bikeName,
+    bikeType: fields.bikeType.value,
+    ridingStyle: fields.ridingStyle.value,
+    currentOdometerKm: numberValue(fields.currentOdometerKm.value),
+    lastRideDistanceKm: numberValue(getStoredProfile().lastRideDistanceKm || 0),
+    lastRideDate: fields.lastRideDate.value || today(),
+    lastServiceDate: fields.lastServiceDate.value || daysAgo(18),
+    lastServiceOdometerKm: numberValue(fields.lastServiceOdometerKm.value),
+    lastChainLubeOdometerKm: numberValue(fields.lastChainLubeOdometerKm.value),
+    lastChainReplacementOdometerKm: numberValue(fields.lastChainReplacementOdometerKm.value),
+    lastBrakeCheckOdometerKm: numberValue(localStorage.getItem("chainwise.lastBrakeCheckOdometerKm") || defaultProfile.lastBrakeCheckOdometerKm),
+    lastTireCheckOdometerKm: numberValue(localStorage.getItem("chainwise.lastTireCheckOdometerKm") || defaultProfile.lastTireCheckOdometerKm),
+    chainCondition: fields.chainCondition.value,
+    chainWear: fields.chainWear.value,
+    brakeCondition: "unknown",
+    brakePadThickness: fields.brakePadThickness.value,
+    brakeSymptoms: fields.brakeSymptoms.value,
+    tireCondition: fields.tireCondition.value,
+    recentPunctures: numberValue(fields.recentPunctures.value),
+    frontTirePressureBar: fields.frontTirePressureBar.value,
+    rearTirePressureBar: fields.rearTirePressureBar.value
+  };
+}
+
+function saveProfile(profile) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+}
+
+function addRide() {
+  const distance = numberValue(rideDistanceInput.value);
+  if (distance <= 0) {
+    setText("status", "Ride needed");
+    return;
+  }
+
+  const profile = readProfile();
+  profile.currentOdometerKm += distance;
+  profile.lastRideDistanceKm = distance;
+  profile.lastRideDate = rideDateInput.value || today();
+  saveProfile(profile);
+  setFormProfile(profile);
+  rideDateInput.value = today();
+  loadCheck();
+}
+
+function quickAction(action) {
+  const profile = readProfile();
+  const current = profile.currentOdometerKm;
+
+  if (action === "chain-lubed") {
+    profile.lastChainLubeOdometerKm = current;
+    profile.chainCondition = "good";
+  }
+
+  if (action === "chain-replaced") {
+    profile.lastChainReplacementOdometerKm = current;
+    profile.lastChainLubeOdometerKm = current;
+    profile.chainCondition = "good";
+    profile.chainWear = "below 0.5%";
+  }
+
+  if (action === "service-done") {
+    profile.lastServiceOdometerKm = current;
+    profile.lastServiceDate = today();
+    localStorage.setItem("chainwise.lastBrakeCheckOdometerKm", String(current));
+    localStorage.setItem("chainwise.lastTireCheckOdometerKm", String(current));
+  }
+
+  if (action === "brakes-checked") {
+    localStorage.setItem("chainwise.lastBrakeCheckOdometerKm", String(current));
+    profile.brakeSymptoms = "none";
+    profile.brakePadThickness = "unknown";
+  }
+
+  if (action === "tires-checked") {
+    localStorage.setItem("chainwise.lastTireCheckOdometerKm", String(current));
+    profile.tireCondition = "good";
+    profile.recentPunctures = 0;
+  }
 
   saveProfile(profile);
-  setProfileForm(profile);
-  rideDistanceInput.value = "";
-  setStatus("Ride added");
+  setFormProfile(profile);
+  loadCheck();
+}
+
+function resetDemoData() {
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem("chainwise.lastBrakeCheckOdometerKm");
+  localStorage.removeItem("chainwise.lastTireCheckOdometerKm");
+  setFormProfile({ ...defaultProfile });
+  rideDistanceInput.value = "32";
   loadCheck();
 }
 
@@ -69,12 +223,10 @@ async function loadCheck() {
   setLoading(true);
 
   try {
-    const profile = getProfileFromForm();
+    const profile = readProfile();
     saveProfile(profile);
 
-    const params = new URLSearchParams(profile);
-    const response = await fetch("/check?" + params.toString());
-
+    const response = await fetch("/check?" + toQuery(profile));
     if (!response.ok) {
       throw new Error("HTTP " + response.status);
     }
@@ -82,11 +234,11 @@ async function loadCheck() {
     const data = await response.json();
     renderCheck(data);
   } catch (error) {
-    setStatus("Error");
-    setText("summary", "Could not calculate the recommendation.");
-    setText("reason", "Data loading error: " + error.message);
+    setText("status", "Error");
+    setText("summary", "Could not load recommendation.");
+    setText("reason", "Error loading data: " + error.message);
     document.getElementById("reason").classList.add("error");
-    setText("priority", "Error");
+    setPriority("error");
   } finally {
     setLoading(false);
   }
@@ -98,120 +250,92 @@ function renderCheck(data) {
   const bike = data.bikeProfile || {};
   const rec = data.recommendation || {};
   const weather = rec.weatherRisk || {};
-  const reminder = weather.reminder || {};
+  const rideAdvice = weather.rideAdvice || {};
 
-  setStatus("Updated");
+  setText("status", "Updated");
   setText("title", rec.recommendation || "Maintenance recommendation");
-  setText("summary", rec.reason || "Recommendation calculated from your bike data and current weather.");
-  setText("priority", readable(rec.priority || "unknown"));
+  setText("summary", rec.reason || "Recommendation calculated from odometer, weather and optional checks.");
+  setPriority(rec.priority || "waiting");
 
-  setText("bike-name-result", bike.name || "—");
-  setText("bike-type-result", bike.type || "—");
-  setText("odometer-result", valueOrDash(bike.currentOdometerKm, " km"));
-  setText("since-lube-result", valueOrDash(rec.kmSinceChainLube, " km"));
-  setText("since-service-result", valueOrDash(rec.kmSinceService, " km"));
+  setText("result-bike-name", bike.name || "—");
+  setText("result-bike-type", bike.type || "—");
+  setText("result-odometer", valueOrDash(bike.currentOdometerKm, " km"));
+  setText("result-chain-km", valueOrDash(rec.kmSinceChainLube, " km"));
+  setText("result-service-km", valueOrDash(rec.kmSinceService, " km"));
 
   setText("city", weather.city || "—");
   setText("condition", readable(weather.condition || "—"));
-  setText("weather-risk", readable(weather.risk || "—"));
-  setText("weather-source", weather.source || "—");
+  setText("feels-like", tempValue(weather.apparentTemperatureC));
+  setText("wind-speed", windValue(weather.windSpeedMs));
+  setText("wind-gusts", windValue(weather.windGustsMs));
 
-  setText("reminder-priority", readable(reminder.priority || rec.priority || "—"));
-  setText("reminder-type", readable(reminder.type || "—"));
-  setText("next-date", reminder.nextDate || rec.nextReminder || "—");
-  setText("channel", readable(reminder.channel || "—"));
+  setText("ride-title", rideAdvice.title || "—");
+  setText("ride-message", rideAdvice.message || "—");
+  renderChips(gearList, rideAdvice.gear || []);
+  renderForecast(rec.componentForecast || []);
 
-  setText("reason", rec.reason || weather.reason || "Recommendation calculated.");
+  setText("reason", rec.reason || "Recommendation calculated.");
 }
 
-function getProfileFromForm() {
-  const currentOdometerKm = numberOrZero(fields.currentOdometerKm.value);
-  let lastServiceOdometerKm = numberOrZero(fields.lastServiceOdometerKm.value);
-  let lastChainLubeOdometerKm = numberOrZero(fields.lastChainLubeOdometerKm.value);
+function renderForecast(items) {
+  forecastList.innerHTML = "";
 
-  if (lastServiceOdometerKm > currentOdometerKm) {
-    lastServiceOdometerKm = currentOdometerKm;
-    fields.lastServiceOdometerKm.value = currentOdometerKm;
+  if (!items.length) {
+    forecastList.innerHTML = '<div class="forecast-item"><div>No forecast available yet.</div></div>';
+    return;
   }
 
-  if (lastChainLubeOdometerKm > currentOdometerKm) {
-    lastChainLubeOdometerKm = currentOdometerKm;
-    fields.lastChainLubeOdometerKm.value = currentOdometerKm;
-  }
+  items.forEach((item) => {
+    const el = document.createElement("article");
+    el.className = "forecast-item";
 
-  return {
-    bikeName: fields.bikeName.value || defaultProfile.bikeName,
-    bikeType: fields.bikeType.value || defaultProfile.bikeType,
-    ridingStyle: fields.ridingStyle.value || defaultProfile.ridingStyle,
-    currentOdometerKm: currentOdometerKm,
-    lastRideDistanceKm: loadProfile().lastRideDistanceKm || 0,
-    lastRideDate: fields.lastRideDate.value || todayISO(),
-    lastServiceDate: fields.lastServiceDate.value || defaultProfile.lastServiceDate,
-    lastServiceOdometerKm: lastServiceOdometerKm,
-    lastChainLubeOdometerKm: lastChainLubeOdometerKm,
-    chainCondition: fields.chainCondition.value || defaultProfile.chainCondition,
-    brakeCondition: fields.brakeCondition.value || defaultProfile.brakeCondition,
-    tireCondition: fields.tireCondition.value || defaultProfile.tireCondition
-  };
+    const kmText = item.remainingKm > 0
+      ? item.remainingKm + " km left"
+      : item.overdueKm > 0
+        ? item.overdueKm + " km overdue"
+        : "due now";
+
+    el.innerHTML = `
+      <div class="forecast-label">${escapeHtml(item.label || item.component)}</div>
+      <div class="forecast-status status-${escapeHtml(item.status || "ok")}">${readable(item.status || "ok")}</div>
+      <div class="forecast-reason">${escapeHtml(item.reason || item.action || "")}</div>
+      <div class="forecast-km">${escapeHtml(kmText)}</div>
+    `;
+
+    forecastList.appendChild(el);
+  });
 }
 
-function loadProfileToForm() {
-  setProfileForm(loadProfile());
-}
-
-function setProfileForm(profile) {
-  fields.bikeName.value = profile.bikeName;
-  fields.bikeType.value = profile.bikeType;
-  fields.ridingStyle.value = profile.ridingStyle;
-  fields.currentOdometerKm.value = profile.currentOdometerKm;
-  fields.lastRideDate.value = profile.lastRideDate;
-  fields.lastServiceDate.value = profile.lastServiceDate;
-  fields.lastServiceOdometerKm.value = profile.lastServiceOdometerKm;
-  fields.lastChainLubeOdometerKm.value = profile.lastChainLubeOdometerKm;
-  fields.chainCondition.value = profile.chainCondition;
-  fields.brakeCondition.value = profile.brakeCondition;
-  fields.tireCondition.value = profile.tireCondition;
-}
-
-function saveProfileFromForm() {
-  saveProfile(getProfileFromForm());
-  setStatus("Saved");
-}
-
-function loadProfile() {
-  const raw = localStorage.getItem(storageKey);
-  if (!raw) {
-    return { ...defaultProfile };
-  }
-
-  try {
-    return { ...defaultProfile, ...JSON.parse(raw) };
-  } catch {
-    return { ...defaultProfile };
-  }
-}
-
-function saveProfile(profile) {
-  localStorage.setItem(storageKey, JSON.stringify(profile));
-}
-
-function resetDemoData() {
-  saveProfile({ ...defaultProfile });
-  setProfileForm({ ...defaultProfile });
-  setStatus("Reset");
-  loadCheck();
+function renderChips(container, values) {
+  container.innerHTML = "";
+  values.forEach((value) => {
+    const chip = document.createElement("span");
+    chip.className = "chip";
+    chip.textContent = readable(value);
+    container.appendChild(chip);
+  });
 }
 
 function setLoading(isLoading) {
   checkButton.disabled = isLoading;
   checkButton.textContent = isLoading ? "Checking..." : "Get recommendation";
-  if (isLoading) {
-    setStatus("Loading");
-  }
+  setText("status", isLoading ? "Loading" : "Ready");
 }
 
-function setStatus(value) {
-  setText("status", value);
+function setPriority(priority) {
+  const el = document.getElementById("priority");
+  el.textContent = readable(priority);
+  el.className = "priority-badge " + String(priority).toLowerCase();
+}
+
+function toQuery(profile) {
+  const params = new URLSearchParams();
+  Object.entries(profile).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      params.set(key, value);
+    }
+  });
+  return params.toString();
 }
 
 function setText(id, value) {
@@ -226,15 +350,163 @@ function valueOrDash(value, suffix) {
   if (value === undefined || value === null || value === "") {
     return "—";
   }
-
   return String(value) + suffix;
 }
 
-function numberOrZero(value) {
-  const parsed = Number.parseInt(value, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+function tempValue(value) {
+  if (value === undefined || value === null || Number.isNaN(Number(value))) {
+    return "—";
+  }
+  return Number(value).toFixed(1) + " °C";
 }
 
-function todayISO() {
+function windValue(value) {
+  if (value === undefined || value === null || Number.isNaN(Number(value))) {
+    return "—";
+  }
+  return Number(value).toFixed(1) + " m/s";
+}
+
+function numberValue(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return 0;
+  }
+  return Math.round(parsed);
+}
+
+function today() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function daysAgo(days) {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return date.toISOString().slice(0, 10);
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function initCustomSelects() {
+  document.querySelectorAll("select").forEach((select) => {
+    if (select.dataset.customSelect === "true") {
+      return;
+    }
+
+    select.dataset.customSelect = "true";
+    select.classList.add("native-select-hidden");
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "cw-select";
+    wrapper.dataset.selectId = select.id;
+
+    const trigger = document.createElement("button");
+    trigger.type = "button";
+    trigger.className = "cw-select-trigger";
+    trigger.setAttribute("aria-haspopup", "listbox");
+    trigger.setAttribute("aria-expanded", "false");
+
+    const menu = document.createElement("div");
+    menu.className = "cw-select-menu";
+    menu.setAttribute("role", "listbox");
+
+    Array.from(select.options).forEach((option) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "cw-select-option";
+      item.textContent = option.textContent;
+      item.dataset.value = option.value;
+      item.setAttribute("role", "option");
+
+      item.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        select.value = option.value;
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+
+        updateCustomSelect(select);
+        closeCustomSelects();
+      });
+
+      menu.appendChild(item);
+    });
+
+    trigger.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const wasOpen = wrapper.classList.contains("is-open");
+      closeCustomSelects();
+
+      if (!wasOpen) {
+        wrapper.classList.add("is-open");
+        trigger.setAttribute("aria-expanded", "true");
+      }
+    });
+
+    wrapper.appendChild(trigger);
+    wrapper.appendChild(menu);
+
+    select.insertAdjacentElement("afterend", wrapper);
+    updateCustomSelect(select);
+  });
+
+  if (!window.chainwiseCustomSelectListenerInstalled) {
+    window.chainwiseCustomSelectListenerInstalled = true;
+
+    document.addEventListener("click", () => {
+      closeCustomSelects();
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closeCustomSelects();
+      }
+    });
+  }
+}
+
+function updateCustomSelect(select) {
+  const wrapper = document.querySelector(`.cw-select[data-select-id="${select.id}"]`);
+
+  if (!wrapper) {
+    return;
+  }
+
+  const trigger = wrapper.querySelector(".cw-select-trigger");
+  const options = wrapper.querySelectorAll(".cw-select-option");
+  const selectedOption = Array.from(select.options).find((option) => option.value === select.value);
+
+  trigger.textContent = selectedOption ? selectedOption.textContent : "Select";
+
+  options.forEach((option) => {
+    const isActive = option.dataset.value === select.value;
+    option.classList.toggle("active", isActive);
+    option.setAttribute("aria-selected", String(isActive));
+  });
+}
+
+function syncCustomSelects() {
+  document.querySelectorAll("select").forEach((select) => {
+    updateCustomSelect(select);
+  });
+}
+
+function closeCustomSelects() {
+  document.querySelectorAll(".cw-select").forEach((select) => {
+    select.classList.remove("is-open");
+
+    const trigger = select.querySelector(".cw-select-trigger");
+    if (trigger) {
+      trigger.setAttribute("aria-expanded", "false");
+    }
+  });
 }
