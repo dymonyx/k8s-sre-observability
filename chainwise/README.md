@@ -1,36 +1,183 @@
 # Chainwise
 
-**Chainwise** is a Go-based microservice application for bicycle maintenance recommendations.
+Chainwise is a Go-based microservice application that helps cyclists maintain a bicycle based on real ride mileage, component history, local weather, and optional manual checks.
 
-The application helps cyclists understand when they should clean, inspect, lubricate, or replace bicycle components based on bicycle usage, weather conditions, and user preferences. It is designed as a simple but realistic distributed application that can later be deployed to Kubernetes and used for observability, reliability, and service mesh experiments.
+The application is built around one bicycle profile. A user can log rides, update the odometer, mark maintenance actions as completed, and receive practical recommendations such as when to lubricate the chain, inspect brakes, check tires, or schedule a full service.
 
+Chainwise is intentionally simple enough to run locally with Docker Compose, but realistic enough to demonstrate service-to-service communication, external API usage, graceful fallbacks, metrics, health checks, and failure scenarios.
+
+## UI
+
+The Chainwise UI provides a simple browser-based workflow for maintaining one bicycle profile.
+
+The main screen contains the bike profile form, odometer-based maintenance fields, optional advanced checks, and a right-side control panel with quick actions. From this panel, the user can add a new ride, update the odometer history, mark maintenance actions as completed, and request a maintenance recommendation.
+
+![pic1](img/pic1.png)
+
+After the bike data is submitted, Chainwise displays a practical maintenance recommendation. The result includes the main action, priority, reason, current weather context, ride advice, component-level forecast, and the next reminder date.
+
+![pic2](img/pic2.png)
 ---
 
-## Application Idea
+## Features
 
-Cyclists often forget regular maintenance tasks such as lubricating the chain, checking tire pressure, inspecting brake pads, cleaning the drivetrain, or replacing worn components. Chainwise provides maintenance recommendations by collecting information about a bike, evaluating current conditions, and generating a suggested maintenance plan.
+### Odometer-based maintenance
 
-A typical user flow:
+Chainwise tracks maintenance using real mileage instead of relying only on manually entered component condition.
 
-1. The user opens the frontend.
-2. The user requests a maintenance check for their bicycle.
-3. The application checks the bicycle profile and usage data.
-4. The application evaluates weather-related maintenance risks.
-5. The application generates a maintenance recommendation.
-6. The application creates a reminder for the next maintenance action.
-7. The user receives a clear recommendation and next service date.
+The main maintenance fields are:
+
+```text
+current odometer
+last chain lubrication odometer
+last chain replacement odometer
+last service odometer
+last brake check odometer
+last tire check odometer
+```
+
+Example:
+
+```text
+Current odometer: 1335 km
+Last chain lube: 1161 km
+Distance since chain lube: 174 km
+Recommendation: Clean and lubricate the chain
+```
+
+### Ride logging
+
+The user can log a new ride through the browser UI:
+
+```text
+Ride distance, km
+Ride date
+```
+
+After adding a ride, Chainwise updates:
+
+```text
+current odometer
+last ride date
+last ride distance
+maintenance forecast
+```
+
+### Maintenance forecast
+
+Chainwise provides a component-level maintenance forecast for:
+
+```text
+Chain lubrication
+Chain replacement
+Brake pads
+Tires
+Full service
+```
+
+Each component receives a status:
+
+```text
+OK
+Soon
+Due now
+Overdue
+Measure needed
+```
+
+The forecast is based on odometer history, bike type, riding style, weather risk, and optional manual checks.
+
+### Optional advanced checks
+
+Advanced checks are optional. The application still works without them.
+
+Optional fields include:
+
+```text
+chain condition
+chain wear measurement
+brake symptoms
+brake pad thickness
+tire condition
+recent punctures
+front tire pressure
+rear tire pressure
+```
+
+If the user provides these values, Chainwise uses them to improve the recommendation. If not, the application falls back to mileage-based logic.
+
+### Weather-aware recommendations
+
+Chainwise uses Open-Meteo to include local weather in maintenance and ride-readiness logic.
+
+Weather data includes:
+
+```text
+temperature
+feels-like temperature
+humidity
+precipitation
+rain
+showers
+snowfall
+weather code
+wind speed in m/s
+wind gusts in m/s
+```
+
+Weather affects maintenance recommendations. For example:
+
+```text
+Rain increases the need for chain lubrication.
+Snow and road salt increase drivetrain cleaning priority.
+High humidity increases corrosion risk.
+Strong wind affects ride readiness.
+```
+
+### Ride advice
+
+Chainwise provides ride-readiness advice based on current weather.
+
+Example:
+
+```text
+Ride with caution
+Weather can affect braking distance, grip and bike handling.
+Recommended gear: full-finger gloves, waterproof jacket, bike lights
+```
+
+Possible ride statuses:
+
+```text
+good
+caution
+not_recommended
+```
+
+### Graceful fallbacks
+
+The application is designed to keep working even if an external dependency is slow or unavailable.
+
+Examples:
+
+```text
+Open-Meteo unavailable -> use fallback weather
+reminder-api unavailable -> use fallback reminder
+```
+
+The user should still receive a recommendation instead of a broken response.
 
 ---
 
 ## Service Architecture
 
-The planned service chain is:
+The request flow is:
 
 ```text
-frontend → bike-api → maintenance-api → weather-api → reminder-api → user-api
+frontend -> bike-api -> maintenance-api -> weather-api -> reminder-api -> user-api
 ```
 
-Each service is planned to be implemented in **Go** as a small HTTP API.
+Each service is implemented as a small Go HTTP API.
 
 ---
 
@@ -38,335 +185,270 @@ Each service is planned to be implemented in **Go** as a small HTTP API.
 
 ### `frontend`
 
-The user-facing entry point of the application.
+Browser-based user interface.
 
 Responsibilities:
 
-* Provide a simple web page or HTTP interface.
-* Allow users to request a bicycle maintenance check.
-* Send requests to `bike-api`.
-* Display the final recommendation returned by the backend services.
-
-Example features:
-
-* Maintenance check button.
-* Display of bike profile.
-* Display of recommended maintenance actions.
-* Display of next reminder date.
-
----
-
-### `bike-api`
-
-The main backend entry point for bicycle-related operations.
-
-Responsibilities:
-
-* Receive maintenance check requests from the frontend.
-* Validate bicycle information.
-* Prepare a bicycle profile for recommendation calculation.
-* Call `maintenance-api` to calculate the final maintenance advice.
-* Return the aggregated result to the frontend.
-
-Example bicycle profile fields:
-
 ```text
-bike type
-last service date
-weekly distance
-riding style
-chain condition
-brake condition
-tire condition
+serve the web UI
+store one bike profile in browser localStorage
+allow the user to log rides
+send bike data to bike-api
+display recommendations, weather, ride advice and maintenance forecast
 ```
 
----
-
-### `maintenance-api`
-
-The core business service of Chainwise.
-
-Responsibilities:
-
-* Calculate maintenance recommendations.
-* Decide which bike components need attention.
-* Adjust recommendations based on usage and weather data.
-* Call `weather-api` to include environmental conditions.
-* Pass reminder information further down the chain.
-
-Example recommendations:
+Endpoints:
 
 ```text
-Clean and lubricate the chain.
-Check tire pressure this week.
-Inspect brake pads after the next 100 km.
-Clean the drivetrain after wet weather rides.
-Schedule a full inspection in two weeks.
-```
-
----
-
-### `weather-api`
-
-A weather context service used by the maintenance logic.
-
-Responsibilities:
-
-* Provide simplified weather information.
-* Estimate how weather affects bicycle maintenance needs.
-* Return risk factors such as rain, snow, humidity, or road salt.
-* Call `reminder-api` to help schedule weather-aware reminders.
-
-Example weather impact rules:
-
-```text
-Rain increases the need for chain lubrication.
-Snow and road salt increase the need for drivetrain cleaning.
-High humidity increases corrosion risk.
-Dry weather keeps the normal maintenance interval.
-```
-
----
-
-### `reminder-api`
-
-A service for creating and managing maintenance reminders.
-
-Responsibilities:
-
-* Generate the next recommended maintenance date.
-* Create a reminder for the user.
-* Adjust reminder urgency based on maintenance priority.
-* Call `user-api` to get user preferences and notification settings.
-
-Example reminder types:
-
-```text
-chain lubrication reminder
-brake inspection reminder
-tire pressure reminder
-drivetrain cleaning reminder
-full service reminder
-```
-
----
-
-### `user-api`
-
-A user profile and preferences service.
-
-Responsibilities:
-
-* Store or return demo user information.
-* Provide notification preferences.
-* Provide cycling habits and maintenance preferences.
-* Return user-specific settings to `reminder-api`.
-
-Example user preferences:
-
-```text
-preferred reminder frequency
-notification channel
-average weekly riding distance
-maintenance experience level
-bike usage type
-```
-
----
-
-## Planned Go Implementation
-
-Each service will be implemented as a small Go HTTP server.
-
-Planned common endpoints for every service:
-
-```text
-GET /healthz     Liveness check
-GET /readyz      Readiness check
-GET /metrics     Prometheus-compatible metrics endpoint
-```
-
-Planned service-specific endpoints:
-
-```text
-frontend:
-  GET /
-  GET /check
-
-bike-api:
-  GET /bike/check
-  GET /bike/profile
-
-maintenance-api:
-  GET /maintenance/recommendation
-
-weather-api:
-  GET /weather/current
-  GET /weather/risk
-
-reminder-api:
-  GET /reminders/next
-  POST /reminders
-
-user-api:
-  GET /users/demo
-  GET /users/preferences
-```
-
----
-
-## Main Features
-
-### Bicycle Maintenance Recommendations
-
-Chainwise generates practical maintenance advice based on bicycle usage and condition.
-
-Example output:
-
-```json
-{
-  "bike": "gravel bike",
-  "recommendation": "Clean and lubricate the chain",
-  "priority": "medium",
-  "reason": "Recent wet weather increases drivetrain wear",
-  "nextReminder": "2026-05-06"
-}
-```
-
----
-
-### Weather-Aware Maintenance Logic
-
-Weather conditions influence the maintenance recommendation. For example, riding in rain or snow can shorten the recommended chain lubrication interval.
-
----
-
-### Reminder Generation
-
-The application can suggest the next maintenance date and create a reminder based on the recommendation priority and user preferences.
-
----
-
-### User Preferences
-
-The application can adapt recommendations to user settings such as riding frequency, bike type, preferred reminder interval, and maintenance experience level.
-
----
-
-### Demo Failure Modes
-
-For future reliability testing, some services may include optional demo failure modes:
-
-```text
-slow response
-random error
-temporary dependency failure
-```
-
-These modes can be useful for testing monitoring, alerting, and incident response later.
-
----
-
-## Example Full Request Flow
-
-```text
-1. User opens the frontend.
-2. frontend calls bike-api.
-3. bike-api loads or creates a bicycle profile.
-4. bike-api calls maintenance-api.
-5. maintenance-api asks weather-api for current maintenance risk.
-6. weather-api calls reminder-api to create a weather-aware reminder.
-7. reminder-api calls user-api to get user preferences.
-8. The final result is returned back through the chain.
-9. The user receives a maintenance recommendation.
-```
-
----
-
-## Example Use Case
-
-A user owns a gravel bike and rides around 80 km per week. Recently, the weather has been rainy. Chainwise detects that wet rides increase drivetrain wear and recommends cleaning and lubricating the chain earlier than usual.
-
-Example result:
-
-```text
-Recommendation: Clean and lubricate the chain
-Priority: Medium
-Reason: Rainy weather increases drivetrain wear
-Next reminder: In 5 days
-```
-
----
-
-## Project Purpose
-
-The first goal of Chainwise is to provide a useful and understandable Go microservice application.
-
-Later, the same application can be used as a demo workload for:
-
-```text
-Kubernetes deployments
-Istio Service Mesh
-service-to-service communication
-observability
-SLI/SLO monitoring
-alerting
-incident response scenarios
-```
-
----
-
-## Status
-
-Current status:
-
-```text
-Application concept: ready
-Service architecture: ready
-Implementation language: Go
-Next step: implement minimal Go services
-```
-
-
-----------------------------------
-# Chainwise
-
-Chainwise is a small Go microservice demo application for bicycle maintenance recommendations. It is designed to be deployed to Kubernetes and used for SRE, observability, SLI/SLO, alerting, service mesh and incident response practice.
-
-## Services
-
-```text
-frontend -> bike-api -> maintenance-api -> weather-api -> reminder-api -> user-api
-```
-
-Every service exposes:
-
-```text
+GET /
+GET /check
 GET /healthz
 GET /readyz
 GET /metrics
 ```
 
-Main application endpoints:
+### `bike-api`
+
+Main bicycle profile service.
+
+Responsibilities:
 
 ```text
-frontend:        GET /, GET /check
-bike-api:        GET /bike/check, GET /bike/profile
-maintenance-api: GET /maintenance/recommendation
-weather-api:     GET /weather/current, GET /weather/risk
-reminder-api:    GET /reminders/next, POST /reminders
-user-api:        GET /users/demo, GET /users/preferences
+receive bike check requests
+parse bike profile parameters
+normalize odometer-based maintenance history
+call maintenance-api
+return the bike profile together with the recommendation
 ```
 
-## Local development
+Endpoints:
 
-Install dependencies:
+```text
+GET /bike/check
+GET /bike/profile
+GET /healthz
+GET /readyz
+GET /metrics
+```
+
+### `maintenance-api`
+
+Core recommendation service.
+
+Responsibilities:
+
+```text
+calculate component maintenance forecast
+calculate chain lubrication status
+estimate chain replacement status
+calculate brake, tire and full service status
+include weather risk from weather-api
+return the main recommendation and detailed component forecast
+```
+
+Endpoints:
+
+```text
+GET /maintenance/recommendation
+GET /healthz
+GET /readyz
+GET /metrics
+```
+
+### `weather-api`
+
+Weather context service.
+
+Responsibilities:
+
+```text
+fetch current weather from Open-Meteo
+include rain, showers, snow, humidity and wind
+calculate weather maintenance risk
+calculate ride advice
+fall back to demo weather if Open-Meteo is unavailable
+call reminder-api to create a weather-aware reminder
+```
+
+Endpoints:
+
+```text
+GET /weather/current
+GET /weather/risk
+GET /healthz
+GET /readyz
+GET /metrics
+```
+
+### `reminder-api`
+
+Reminder calculation service.
+
+Responsibilities:
+
+```text
+calculate next reminder date
+adjust reminder urgency by maintenance risk
+read user preferences from user-api
+return reminder type, date, priority and notification channel
+```
+
+Endpoints:
+
+```text
+GET /reminders/next
+POST /reminders
+GET /healthz
+GET /readyz
+GET /metrics
+```
+
+### `user-api`
+
+Demo user preferences service.
+
+Responsibilities:
+
+```text
+return demo user information
+return reminder preferences
+return notification settings
+```
+
+Endpoints:
+
+```text
+GET /users/demo
+GET /users/preferences
+GET /healthz
+GET /readyz
+GET /metrics
+```
+
+---
+
+## Browser UI Example
+
+Start the application and open:
+
+```text
+http://localhost:8080
+```
+
+Typical browser workflow:
+
+1. Open the Chainwise UI.
+
+2. Fill in the bike profile:
+
+   ```text
+   Bike name: My Gravel Bike
+   Bike type: gravel bike
+   Riding style: daily commuting
+   Current odometer: 1335 km
+   Last service at: 983 km
+   Last chain lube at: 1161 km
+   Last chain replacement at: 340 km
+   ```
+
+3. Optionally open `Advanced checks` and enter additional details:
+
+   ```text
+   Chain wear measurement
+   Brake symptoms
+   Brake pad thickness
+   Tire condition
+   Recent punctures
+   Tire pressure
+   ```
+
+4. Add a new ride:
+
+   ```text
+   Ride distance: 32 km
+   Ride date: 2026-05-04
+   ```
+
+5. Click `Add ride`.
+
+6. Click `Get recommendation`.
+
+7. Chainwise displays the main recommendation, priority, reason, weather, wind, ride advice, component forecast, and next reminder date.
+
+Example result:
+
+```text
+Recommendation: Clean and lubricate the chain
+Priority: high
+Reason: You rode 174 km since the last chain lubrication. Wet weather shortens the lubrication interval.
+
+Ride advice: Ride with caution
+Gear: waterproof jacket, bike lights
+
+Maintenance forecast:
+Chain lubrication: Due now
+Chain replacement: Measure soon
+Brake pads: OK
+Tires: OK
+Full service: OK
+```
+
+---
+
+## Quick Actions
+
+The UI provides quick actions for common maintenance events:
+
+```text
+Mark chain lubricated
+Mark chain replaced
+Mark full service done
+Mark brakes checked
+Mark tires checked
+```
+
+These actions update the related odometer history automatically.
+
+Example:
+
+```text
+Click "Mark chain lubricated"
+last chain lube odometer = current odometer
+```
+
+---
+
+## Local Development
+
+Install Go dependencies:
 
 ```bash
 go mod tidy
 ```
 
-Run services in separate terminals:
+Run tests:
+
+```bash
+go test ./...
+```
+
+Run all services with Docker Compose:
+
+```bash
+docker compose up --build
+```
+
+Open the UI:
+
+```text
+http://localhost:8080
+```
+
+---
+
+## Running Services Manually
+
+You can run services in separate terminals:
 
 ```bash
 make run-user-api
@@ -377,30 +459,206 @@ make run-bike-api
 make run-frontend
 ```
 
-Open:
+The services should be started in dependency order:
 
 ```text
-http://localhost:8080
-http://localhost:8080/check
+user-api
+reminder-api
+weather-api
+maintenance-api
+bike-api
+frontend
 ```
 
-Or run with Docker Compose:
+---
+
+## Configuration
+
+Common environment variables:
+
+```text
+PORT
+HTTP_TIMEOUT
+DEMO_LATENCY_MS
+DEMO_FAIL_RATE
+```
+
+Service URL variables:
+
+```text
+BIKE_API_URL
+MAINTENANCE_API_URL
+WEATHER_API_URL
+REMINDER_API_URL
+USER_API_URL
+```
+
+Weather configuration:
+
+```text
+WEATHER_CITY
+WEATHER_LATITUDE
+WEATHER_LONGITUDE
+DEMO_WEATHER
+```
+
+Example for Saint Petersburg:
+
+```yaml
+weather-api:
+  environment:
+    PORT: "8083"
+    REMINDER_API_URL: http://reminder-api:8084
+    HTTP_TIMEOUT: 8s
+    WEATHER_CITY: "Saint Petersburg"
+    WEATHER_LATITUDE: "59.9311"
+    WEATHER_LONGITUDE: "30.3609"
+    DEMO_WEATHER: rainy
+```
+
+After changing weather environment variables, recreate the weather service:
 
 ```bash
-docker compose up --build
+docker compose up -d --force-recreate weather-api
 ```
 
-## Demo failure modes
+Check current weather:
 
-Each service supports optional env vars for SRE experiments:
+```bash
+curl http://localhost:8083/weather/current
+```
+
+---
+
+## Demo Failure Modes
+
+Each service supports optional demo failure modes.
+
+Add artificial latency:
 
 ```bash
 DEMO_LATENCY_MS=500
+```
+
+Add random failures:
+
+```bash
 DEMO_FAIL_RATE=0.2
 ```
 
-For weather-aware recommendations:
+These are useful for testing retries, fallbacks, monitoring, alerting and incident response behavior.
+
+---
+
+## API Examples
+
+Check the whole application through the frontend:
 
 ```bash
-DEMO_WEATHER=rainy    # dry, rainy, snowy, humid
+curl http://localhost:8080/check
+```
+
+Call bike-api directly:
+
+```bash
+curl "http://localhost:8081/bike/check?bikeName=My%20Gravel%20Bike&bikeType=gravel%20bike&currentOdometerKm=1335&lastChainLubeOdometerKm=1161&lastServiceOdometerKm=983"
+```
+
+Check weather:
+
+```bash
+curl http://localhost:8083/weather/current
+curl http://localhost:8083/weather/risk
+```
+
+Health checks:
+
+```bash
+curl http://localhost:8080/healthz
+curl http://localhost:8081/healthz
+curl http://localhost:8082/healthz
+curl http://localhost:8083/healthz
+curl http://localhost:8084/healthz
+curl http://localhost:8085/healthz
+```
+
+Metrics:
+
+```bash
+curl http://localhost:8080/metrics
+```
+
+---
+
+## Example Response
+
+Example `/check` response:
+
+```json
+{
+  "bikeProfile": {
+    "name": "My Gravel Bike",
+    "type": "gravel bike",
+    "currentOdometerKm": 1335,
+    "lastChainLubeOdometerKm": 1161,
+    "lastServiceOdometerKm": 983
+  },
+  "recommendation": {
+    "bike": "My Gravel Bike",
+    "recommendation": "Clean and lubricate the chain",
+    "priority": "high",
+    "reason": "You rode 174 km since the last chain lubrication. Wet weather shortens the lubrication interval.",
+    "kmSinceService": 352,
+    "kmSinceChainLube": 174,
+    "nextReminder": "2026-05-11",
+    "componentForecast": [
+      {
+        "component": "chain_lubrication",
+        "label": "Chain lubrication",
+        "status": "due_now",
+        "priority": "high",
+        "kmSince": 174,
+        "intervalKm": 120,
+        "remainingKm": 0,
+        "overdueKm": 54,
+        "action": "Clean and lubricate the chain"
+      }
+    ]
+  }
+}
+```
+
+---
+
+## Project Structure
+
+```text
+cmd/
+  frontend/
+  bike-api/
+  maintenance-api/
+  weather-api/
+  reminder-api/
+  user-api/
+
+internal/
+  config/
+  frontendui/
+  httpx/
+  model/
+  observability/
+```
+
+---
+
+## Current Status
+
+```text
+Application concept: implemented
+Frontend UI: implemented
+Service architecture: implemented
+Weather integration: Open-Meteo
+Maintenance logic: odometer-based with optional advanced checks
+Runtime: Docker Compose
+Language: Go
 ```
