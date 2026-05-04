@@ -32,11 +32,21 @@ type openMeteoResponse struct {
 		Humidity             int     `json:"relative_humidity_2m"`
 		PrecipitationMM      float64 `json:"precipitation"`
 		RainMM               float64 `json:"rain"`
+		ShowersMM            float64 `json:"showers"`
 		SnowfallCM           float64 `json:"snowfall"`
 		WeatherCode          int     `json:"weather_code"`
 		WindSpeedMS          float64 `json:"wind_speed_10m"`
 		WindGustsMS          float64 `json:"wind_gusts_10m"`
 	} `json:"current"`
+
+	Hourly struct {
+		Time                     []string  `json:"time"`
+		PrecipitationProbability []int     `json:"precipitation_probability"`
+		PrecipitationMM          []float64 `json:"precipitation"`
+		RainMM                   []float64 `json:"rain"`
+		ShowersMM                []float64 `json:"showers"`
+		WeatherCode              []int     `json:"weather_code"`
+	} `json:"hourly"`
 }
 
 func main() {
@@ -134,9 +144,13 @@ func (s *weatherService) currentWeather(ctx context.Context) (model.WeatherCurre
 	query := endpoint.Query()
 	query.Set("latitude", fmt.Sprintf("%.4f", s.latitude))
 	query.Set("longitude", fmt.Sprintf("%.4f", s.longitude))
-	query.Set("current", "temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,rain,snowfall,weather_code,wind_speed_10m,wind_gusts_10m")
+	query.Set("current", "temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,rain,showers,snowfall,weather_code,wind_speed_10m,wind_gusts_10m")
+	query.Set("hourly", "precipitation_probability,precipitation,rain,showers,weather_code")
+	query.Set("forecast_hours", "4")
+	query.Set("past_hours", "1")
 	query.Set("wind_speed_unit", "ms")
 	query.Set("timezone", "auto")
+	query.Set("cell_selection", "nearest")
 	endpoint.RawQuery = query.Encode()
 
 	var response openMeteoResponse
@@ -145,14 +159,20 @@ func (s *weatherService) currentWeather(ctx context.Context) (model.WeatherCurre
 	}
 
 	current := response.Current
-	condition := conditionFromWeather(current.WeatherCode, current.RainMM, current.SnowfallCM)
+	wetNearby := hourlyLooksWet(response.Hourly)
+	rainMM := current.RainMM + current.ShowersMM
+
+	condition := conditionFromWeather(current.WeatherCode, rainMM, current.SnowfallCM)
+	if condition == "dry" && wetNearby {
+		condition = "rainy"
+	}
 
 	weather := model.WeatherCurrent{
 		City:                 s.city,
 		Condition:            condition,
 		TemperatureC:         current.TemperatureC,
 		ApparentTemperatureC: current.ApparentTemperatureC,
-		Rain:                 current.RainMM > 0 || current.PrecipitationMM > 0,
+		Rain:                 current.RainMM > 0 || current.ShowersMM > 0 || current.PrecipitationMM > 0 || wetNearby,
 		Snow:                 current.SnowfallCM > 0,
 		Humidity:             current.Humidity,
 		PrecipitationMM:      current.PrecipitationMM,
@@ -346,4 +366,42 @@ func firstNonEmpty(value string, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func hourlyLooksWet(hourly struct {
+	Time                     []string  `json:"time"`
+	PrecipitationProbability []int     `json:"precipitation_probability"`
+	PrecipitationMM          []float64 `json:"precipitation"`
+	RainMM                   []float64 `json:"rain"`
+	ShowersMM                []float64 `json:"showers"`
+	WeatherCode              []int     `json:"weather_code"`
+}) bool {
+	maxItems := 5
+
+	for i := 0; i < maxItems; i++ {
+		if i < len(hourly.PrecipitationMM) && hourly.PrecipitationMM[i] > 0 {
+			return true
+		}
+
+		if i < len(hourly.RainMM) && hourly.RainMM[i] > 0 {
+			return true
+		}
+
+		if i < len(hourly.ShowersMM) && hourly.ShowersMM[i] > 0 {
+			return true
+		}
+
+		if i < len(hourly.PrecipitationProbability) && hourly.PrecipitationProbability[i] >= 40 {
+			return true
+		}
+
+		if i < len(hourly.WeatherCode) {
+			code := hourly.WeatherCode[i]
+			if code >= 51 && code <= 67 || code >= 80 && code <= 82 {
+				return true
+			}
+		}
+	}
+
+	return false
 }
