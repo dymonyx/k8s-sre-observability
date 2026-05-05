@@ -251,8 +251,6 @@ async function loadCheck() {
 }
 
 function renderCheck(data) {
-  document.getElementById("reason").classList.remove("error");
-
   const bike = data.bikeProfile || {};
   const rec = data.recommendation || {};
   const weather = rec.weatherRisk || {};
@@ -279,8 +277,6 @@ function renderCheck(data) {
   setText("ride-message", rideAdvice.message || "—");
   renderChips(gearList, rideAdvice.gear || []);
   renderForecast(rec.componentForecast || []);
-
-  setText("reason", rec.reason || "Recommendation calculated.");
 }
 
 function renderForecast(items) {
@@ -345,7 +341,11 @@ function toQuery(profile) {
 }
 
 function setText(id, value) {
-  document.getElementById(id).textContent = value;
+  const element = document.getElementById(id);
+  if (!element) {
+    return;
+  }
+  element.textContent = value;
 }
 
 function readable(value) {
