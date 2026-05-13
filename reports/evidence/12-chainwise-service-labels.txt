@@ -1,0 +1,7 @@
+NAME              TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE     LABELS
+bike-api          ClusterIP   10.233.45.211   <none>        8081/TCP   3h11m   app.kubernetes.io/component=backend,app.kubernetes.io/name=bike-api,app.kubernetes.io/part-of=chainwise,monitoring.chainwise.io/scrape=true
+frontend          ClusterIP   10.233.56.64    <none>        8080/TCP   3h11m   app.kubernetes.io/component=frontend,app.kubernetes.io/name=frontend,app.kubernetes.io/part-of=chainwise,monitoring.chainwise.io/scrape=true
+maintenance-api   ClusterIP   10.233.1.83     <none>        8082/TCP   3h11m   app.kubernetes.io/component=backend,app.kubernetes.io/name=maintenance-api,app.kubernetes.io/part-of=chainwise,monitoring.chainwise.io/scrape=true
+reminder-api      ClusterIP   10.233.38.107   <none>        8084/TCP   3h11m   app.kubernetes.io/component=backend,app.kubernetes.io/name=reminder-api,app.kubernetes.io/part-of=chainwise,monitoring.chainwise.io/scrape=true
+user-api          ClusterIP   10.233.39.158   <none>        8085/TCP   3h11m   app.kubernetes.io/component=backend,app.kubernetes.io/name=user-api,app.kubernetes.io/part-of=chainwise,monitoring.chainwise.io/scrape=true
+weather-api       ClusterIP   10.233.45.222   <none>        8083/TCP   3h11m   app.kubernetes.io/component=backend,app.kubernetes.io/name=weather-api,app.kubernetes.io/part-of=chainwise,monitoring.chainwise.io/scrape=true

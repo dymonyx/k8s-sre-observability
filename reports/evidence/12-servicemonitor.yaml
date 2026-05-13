@@ -1,0 +1,24 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"monitoring.coreos.com/v1","kind":"ServiceMonitor","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"chainwise-services","app.kubernetes.io/part-of":"chainwise"},"name":"chainwise-services","namespace":"chainwise"},"spec":{"endpoints":[{"interval":"30s","path":"/metrics","port":"http","scrapeTimeout":"5s"}],"selector":{"matchLabels":{"monitoring.chainwise.io/scrape":"true"}}}}
+  creationTimestamp: "2026-05-13T13:41:20Z"
+  generation: 1
+  labels:
+    app.kubernetes.io/name: chainwise-services
+    app.kubernetes.io/part-of: chainwise
+  name: chainwise-services
+  namespace: chainwise
+  resourceVersion: "2205736"
+  uid: f5eecea2-6e96-40bb-9c51-318001ec1c8f
+spec:
+  endpoints:
+  - interval: 30s
+    path: /metrics
+    port: http
+    scrapeTimeout: 5s
+  selector:
+    matchLabels:
+      monitoring.chainwise.io/scrape: "true"
