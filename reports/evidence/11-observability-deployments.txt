@@ -1,0 +1,4 @@
+NAME                                 READY   UP-TO-DATE   AVAILABLE   AGE
+kps-grafana                          1/1     1            1           5m49s
+kps-kube-prometheus-stack-operator   1/1     1            1           5m49s
+kps-kube-state-metrics               1/1     1            1           5m49s
