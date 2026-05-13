@@ -1,0 +1,18 @@
+# HELP chainwise_http_requests_total Total number of HTTP requests handled by the service.
+# TYPE chainwise_http_requests_total counter
+chainwise_http_requests_total{service="frontend",method="GET",path="/",status="200"} 1
+chainwise_http_requests_total{service="frontend",method="GET",path="/app.js",status="200"} 1
+chainwise_http_requests_total{service="frontend",method="GET",path="/check",status="200"} 4
+chainwise_http_requests_total{service="frontend",method="GET",path="/check",status="502"} 1
+chainwise_http_requests_total{service="frontend",method="GET",path="/healthz",status="200"} 354
+chainwise_http_requests_total{service="frontend",method="GET",path="/readyz",status="200"} 703
+chainwise_http_requests_total{service="frontend",method="GET",path="/styles.css",status="200"} 1
+# HELP chainwise_http_request_duration_seconds_sum Total HTTP request duration in seconds.
+# TYPE chainwise_http_request_duration_seconds_sum counter
+chainwise_http_request_duration_seconds_sum{service="frontend",method="GET",path="/",status="200"} 0.011822
+chainwise_http_request_duration_seconds_sum{service="frontend",method="GET",path="/app.js",status="200"} 0.000231
+chainwise_http_request_duration_seconds_sum{service="frontend",method="GET",path="/check",status="200"} 0.548126
+chainwise_http_request_duration_seconds_sum{service="frontend",method="GET",path="/check",status="502"} 3.001742
+chainwise_http_request_duration_seconds_sum{service="frontend",method="GET",path="/healthz",status="200"} 0.016227
+chainwise_http_request_duration_seconds_sum{service="frontend",method="GET",path="/readyz",status="200"} 0.031953
+chainwise_http_request_duration_seconds_sum{service="frontend",method="GET",path="/styles.css",status="200"} 0.000128

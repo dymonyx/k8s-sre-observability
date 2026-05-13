@@ -1,0 +1,7 @@
+NAME              TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE
+bike-api          ClusterIP   10.233.45.211   <none>        8081/TCP   97m
+frontend          ClusterIP   10.233.56.64    <none>        8080/TCP   97m
+maintenance-api   ClusterIP   10.233.1.83     <none>        8082/TCP   97m
+reminder-api      ClusterIP   10.233.38.107   <none>        8084/TCP   97m
+user-api          ClusterIP   10.233.39.158   <none>        8085/TCP   97m
+weather-api       ClusterIP   10.233.45.222   <none>        8083/TCP   97m

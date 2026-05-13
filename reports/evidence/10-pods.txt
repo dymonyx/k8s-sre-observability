@@ -1,0 +1,7 @@
+NAME                               READY   STATUS    RESTARTS   AGE   IP              NODE       NOMINATED NODE   READINESS GATES
+bike-api-667dc596f4-v7j9n          1/1     Running   0          57m   10.233.72.212   worker-2   <none>           <none>
+frontend-845d484f45-xj7w6          1/1     Running   0          57m   10.233.72.213   worker-2   <none>           <none>
+maintenance-api-78bbbfbcf9-rplk9   1/1     Running   0          57m   10.233.72.214   worker-2   <none>           <none>
+reminder-api-79c95b66b8-6p4jz      1/1     Running   0          57m   10.233.72.215   worker-2   <none>           <none>
+user-api-b7bf587f9-9mz7g           1/1     Running   0          57m   10.233.72.216   worker-2   <none>           <none>
+weather-api-5fd4b4f8cf-xjsh2       1/1     Running   0          57m   10.233.72.217   worker-2   <none>           <none>

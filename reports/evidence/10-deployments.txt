@@ -1,0 +1,7 @@
+NAME              READY   UP-TO-DATE   AVAILABLE   AGE
+bike-api          1/1     1            1           97m
+frontend          1/1     1            1           97m
+maintenance-api   1/1     1            1           97m
+reminder-api      1/1     1            1           97m
+user-api          1/1     1            1           97m
+weather-api       1/1     1            1           97m
