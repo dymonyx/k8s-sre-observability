@@ -32,6 +32,7 @@ The Russian university report can be maintained separately. This README is inten
     - [Accessing Alertmanager](#accessing-alertmanager)
     - [Evidence](#evidence)
   - [12. Prometheus Scraping for Chainwise](#12-prometheus-scraping-for-chainwise)
+  - [13. Grafana Service Overview Dashboard](#13-grafana-service-overview-dashboard)
 
 ---
 
@@ -869,3 +870,71 @@ sum by (service) (rate(chainwise_http_request_duration_seconds_count{namespace="
 Calculates average request duration per service.
 
 At this stage, Prometheus successfully discovered all Chainwise services and collected both request counter and request duration metrics.
+
+## 13. Grafana Service Overview Dashboard
+
+A Grafana dashboard was created for basic Chainwise service health and traffic monitoring.
+
+Dashboard name:
+
+```text
+Chainwise Service Overview
+```
+
+The dashboard includes:
+
+- request rate by service;
+- 5xx error rate by service;
+- average request duration by service;
+- HTTP requests by status code;
+- Chainwise target health;
+- total request count;
+- per-service filtering using the `service` variable.
+
+The dashboard uses Prometheus as a data source and Chainwise metrics collected from the `chainwise` namespace.
+
+Main PromQL queries:
+
+```promql
+sum by (service) (
+  rate(chainwise_http_requests_total{namespace="chainwise", service=~"$service"}[5m])
+)
+```
+
+```promql
+sum by (service) (
+  rate(chainwise_http_requests_total{namespace="chainwise", service=~"$service", status=~"5.."}[5m])
+)
+```
+
+```promql
+sum by (service) (
+  rate(chainwise_http_request_duration_seconds_sum{namespace="chainwise", service=~"$service"}[5m])
+)
+/
+sum by (service) (
+  rate(chainwise_http_requests_total{namespace="chainwise", service=~"$service"}[5m])
+)
+```
+
+```promql
+sum by (service, status) (
+  rate(chainwise_http_requests_total{namespace="chainwise", service=~"$service"}[5m])
+)
+```
+
+```promql
+up{namespace="chainwise", service=~"$service"}
+```
+
+The exported dashboard JSON is stored in:
+
+```text
+monitoring/dashboards/chainwise-service-overview.json
+```
+
+Evidence screenshot:
+
+```text
+reports/evidence/13-grafana-service-overview.png
+```
