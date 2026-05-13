@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: maintenance-api
+  namespace: chainwise
+  labels:
+    app.kubernetes.io/name: maintenance-api
+    app.kubernetes.io/part-of: chainwise
+    app.kubernetes.io/component: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: maintenance-api
+      app.kubernetes.io/part-of: chainwise
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: maintenance-api
+        app.kubernetes.io/part-of: chainwise
+        app.kubernetes.io/component: backend
+    spec:
+      containers:
+        - name: maintenance-api
+          image: chainwise/maintenance-api:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8082
+          env:
+            - name: PORT
+              value: "8082"
+            - name: WEATHER_API_URL
+              value: "http://weather-api:8083"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: maintenance-api
+  namespace: chainwise
+  labels:
+    app.kubernetes.io/name: maintenance-api
+    app.kubernetes.io/part-of: chainwise
+    app.kubernetes.io/component: backend
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: maintenance-api
+    app.kubernetes.io/part-of: chainwise
+  ports:
+    - name: http
+      port: 8082
+      targetPort: http
