@@ -31,6 +31,7 @@ The Russian university report can be maintained separately. This README is inten
     - [Accessing Grafana](#accessing-grafana)
     - [Accessing Alertmanager](#accessing-alertmanager)
     - [Evidence](#evidence)
+  - [12. Prometheus Scraping for Chainwise](#12-prometheus-scraping-for-chainwise)
 
 ---
 
@@ -773,3 +774,98 @@ curl -s http://localhost:9093/-/ready > reports/evidence/11-alertmanager-ready.t
 Grafana UI verification can be saved as a screenshot.
 
 At the end of this stage, Prometheus, Grafana, and Alertmanager were installed and accessible. The next stage is to configure Prometheus scraping for Chainwise services.
+
+## 12. Prometheus Scraping for Chainwise
+
+Prometheus scraping for Chainwise was configured using a `ServiceMonitor`.
+
+The `ServiceMonitor` selects Chainwise Kubernetes Services by the label:
+
+```yaml
+monitoring.chainwise.io/scrape: "true"
+```
+
+All Chainwise services expose metrics on:
+
+```text
+/metrics
+```
+
+The ServiceMonitor configuration is stored in:
+
+```text
+monitoring/servicemonitors/chainwise-servicemonitor.yaml
+```
+
+The ServiceMonitor was applied with:
+
+```bash
+kubectl apply -f monitoring/servicemonitors/chainwise-servicemonitor.yaml
+```
+
+It was verified with:
+
+```bash
+kubectl get servicemonitor -n chainwise
+kubectl describe servicemonitor chainwise-services -n chainwise
+```
+
+Prometheus UI was opened with:
+
+```bash
+kubectl -n observability port-forward svc/kps-kube-prometheus-stack-prometheus 9090:9090
+```
+
+Prometheus was checked at:
+
+```text
+http://localhost:9090
+```
+
+The following PromQL queries were used for verification:
+
+```promql
+up{namespace="chainwise"}
+```
+
+Checks that Prometheus sees Chainwise targets. Expected result: six targets with value `1`.
+
+```promql
+chainwise_http_requests_total
+```
+
+Checks that Chainwise request counters are collected.
+
+```promql
+sum by (service) (chainwise_http_requests_total{namespace="chainwise"})
+```
+
+Shows total collected HTTP requests grouped by Chainwise service.
+
+```promql
+sum by (service, path, status) (chainwise_http_requests_total{namespace="chainwise"})
+```
+
+Shows request counters grouped by service, endpoint path, and HTTP status code.
+
+```promql
+chainwise_http_request_duration_seconds_sum
+```
+
+Checks the request duration count metric.
+
+```promql
+sum by (service) (rate(chainwise_http_requests_total{namespace="chainwise"}[5m]))
+```
+
+Shows request rate per service.
+
+```promql
+sum by (service) (rate(chainwise_http_request_duration_seconds_sum{namespace="chainwise"}[5m]))
+/
+sum by (service) (rate(chainwise_http_request_duration_seconds_count{namespace="chainwise"}[5m]))
+```
+
+Calculates average request duration per service.
+
+At this stage, Prometheus successfully discovered all Chainwise services and collected both request counter and request duration metrics.
