@@ -66,6 +66,7 @@ metadata:
     app.kubernetes.io/name: user-api
     app.kubernetes.io/part-of: chainwise
     app.kubernetes.io/component: backend
+    monitoring.chainwise.io/scrape: "true"
 spec:
   type: ClusterIP
   selector:
