@@ -835,7 +835,7 @@ Checks that Prometheus sees Chainwise targets. Expected result: six targets with
 chainwise_http_requests_total
 ```
 
-Checks that Chainwise request counters are collected.
+Checks that Chainwise HTTP request counters are collected.
 
 ```promql
 sum by (service) (chainwise_http_requests_total{namespace="chainwise"})
@@ -844,32 +844,36 @@ sum by (service) (chainwise_http_requests_total{namespace="chainwise"})
 Shows total collected HTTP requests grouped by Chainwise service.
 
 ```promql
-sum by (service, path, status) (chainwise_http_requests_total{namespace="chainwise"})
+sum by (service, method, path, status) (chainwise_http_requests_total{namespace="chainwise"})
 ```
 
-Shows request counters grouped by service, endpoint path, and HTTP status code.
+Shows request counters grouped by service, HTTP method, endpoint path, and HTTP status code.
 
 ```promql
 chainwise_http_request_duration_seconds_sum
 ```
 
-Checks the request duration count metric.
+Checks that Chainwise HTTP request duration sum metrics are collected.
 
 ```promql
 sum by (service) (rate(chainwise_http_requests_total{namespace="chainwise"}[5m]))
 ```
 
-Shows request rate per service.
+Shows HTTP request rate per Chainwise service.
 
 ```promql
-sum by (service) (rate(chainwise_http_request_duration_seconds_sum{namespace="chainwise"}[5m]))
+sum by (service) (
+  rate(chainwise_http_request_duration_seconds_sum{namespace="chainwise"}[5m])
+)
 /
-sum by (service) (rate(chainwise_http_request_duration_seconds_count{namespace="chainwise"}[5m]))
+sum by (service) (
+  rate(chainwise_http_requests_total{namespace="chainwise"}[5m])
+)
 ```
 
-Calculates average request duration per service.
+Calculates average HTTP request duration per service in seconds.
 
-At this stage, Prometheus successfully discovered all Chainwise services and collected both request counter and request duration metrics.
+At this stage, Prometheus successfully discovered all Chainwise services and collected both HTTP request counter metrics and HTTP request duration sum metrics.
 
 ## 13. Grafana Service Overview Dashboard
 
