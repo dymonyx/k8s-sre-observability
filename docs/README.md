@@ -35,6 +35,7 @@ The Russian university report can be maintained separately. This README is inten
   - [13. Grafana Service Overview Dashboard](#13-grafana-service-overview-dashboard)
   - [14. Chainwise SLI/SLO Model](#14-chainwise-slislo-model)
   - [15. Prometheus Recording Rules for Chainwise SLO Inputs](#15-prometheus-recording-rules-for-chainwise-slo-inputs)
+  - [16. SLO-based Burn-rate Alerts](#16-slo-based-burn-rate-alerts)
 
 ---
 
@@ -1109,4 +1110,130 @@ Evidence screenshot was saved in:
 
 ```text
 reports/evidence/15-prometheus-recording-rules.png
+```
+
+## 16. SLO-based Burn-rate Alerts
+
+SLO-based alerting rules were added for the main Chainwise recommendation flow.
+
+The alert rules are stored in:
+
+```text
+monitoring/prometheus-rules/chainwise-slo-alerts.yaml
+```
+
+The rules are defined as a `PrometheusRule` resource in the `observability` namespace.
+
+The alerts focus on the primary user-facing endpoint:
+
+```text
+frontend /check
+```
+
+This endpoint was selected because it represents the complete Chainwise recommendation flow.
+
+The following alerts were added:
+
+| Alert | Severity | Purpose |
+|---|---|---|
+| `ChainwiseAvailabilityBurnRatePage` | `page` | Detects fast availability error budget burn |
+| `ChainwiseAvailabilityBurnRateTicket` | `ticket` | Detects slower but still elevated availability error budget burn |
+| `ChainwiseLatencyHighPage` | `page` | Detects critical latency degradation |
+| `ChainwiseLatencyHighTicket` | `ticket` | Detects latency above the SLO target |
+
+Availability alerts are based on the burn rate recording rule:
+
+```promql
+chainwise:frontend_check:burn_rate5m
+```
+
+The availability page alert fires when the burn rate is above `12` for more than `2m`.
+
+The availability ticket alert fires when the burn rate is above `3` for more than `5m`.
+
+For a 1-day SLO window, these thresholds mean:
+
+```text
+burn_rate > 12  -> the daily error budget may be exhausted in about 2 hours
+burn_rate > 3   -> the daily error budget may be exhausted in about 8 hours
+```
+
+Latency alerts are SLO threshold alerts based on average request duration because the current Chainwise metrics do not expose histogram buckets.
+
+The latency ticket alert fires when average successful `/check` latency is above the SLO target:
+
+```text
+0.5 seconds
+```
+
+The latency page alert fires when average successful `/check` latency is critically high:
+
+```text
+1 second
+```
+
+All alerts include severity labels:
+
+```text
+severity="page"
+severity="ticket"
+```
+
+These labels will be used later by Alertmanager routing to send urgent and non-urgent alerts to different receivers.
+
+The alerts also include dashboard and runbook annotations:
+
+```text
+dashboard_url
+runbook_url
+```
+
+The dashboard URL points to the planned Grafana SLO dashboard:
+
+```text
+https://grafana.dymonyx.ru/d/chainwise-slo/chainwise-slo-overview
+```
+
+This URL will be finalized after the Grafana SLO dashboard is created and Grafana access is configured.
+
+The runbook URLs are placeholders for the runbooks that will be added in a later task.
+
+The alert rules were applied with:
+
+```bash
+kubectl apply -f monitoring/prometheus-rules/chainwise-slo-alerts.yaml
+```
+
+The `PrometheusRule` resource was verified with:
+
+```bash
+kubectl -n observability get prometheusrule chainwise-slo-alerts
+```
+
+Availability alert firing was verified by injecting controlled failures into `bike-api`:
+
+```bash
+kubectl -n chainwise set env deploy/bike-api DEMO_FAIL_RATE=0.3
+kubectl -n chainwise rollout status deploy/bike-api
+```
+
+Traffic was generated against the user-facing endpoint:
+
+```text
+frontend /check
+```
+
+Prometheus showed the availability alerts in firing state.
+
+After verification, the demo failure mode was disabled:
+
+```bash
+kubectl -n chainwise set env deploy/bike-api DEMO_FAIL_RATE=0
+kubectl -n chainwise rollout status deploy/bike-api
+```
+
+Evidence screenshot was saved in:
+
+```text
+reports/evidence/16-availability-alert-firing-prometheus.png
 ```
