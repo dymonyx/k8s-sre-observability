@@ -1,0 +1,72 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: chainwise-slo-alerts
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: chainwise-slo-alerts
+    app.kubernetes.io/part-of: chainwise
+spec:
+  groups:
+    - name: chainwise.slo.alerts
+      interval: 30s
+      rules:
+        - alert: ChainwiseAvailabilityBurnRatePage
+          expr: |
+            chainwise:frontend_check:burn_rate5m > 12
+          for: 2m
+          labels:
+            severity: page
+            service: frontend
+            endpoint: /check
+            slo: availability
+          annotations:
+            summary: "Chainwise availability error budget is burning fast"
+            description: "The frontend /check availability burn rate is above 12 for more than 2 minutes. Current value: {{ $value }}."
+            dashboard_url: "https://grafana.dymonyx.ru/d/chainwise-slo/chainwise-slo-overview"
+            runbook_url: "https://github.com/dymonyx/k8s-sre-observability/blob/main/runbooks/chainwise-availability-burn-rate.md"
+
+        - alert: ChainwiseAvailabilityBurnRateTicket
+          expr: |
+            chainwise:frontend_check:burn_rate5m > 3
+          for: 5m
+          labels:
+            severity: ticket
+            service: frontend
+            endpoint: /check
+            slo: availability
+          annotations:
+            summary: "Chainwise availability error budget is being consumed faster than expected"
+            description: "The frontend /check availability burn rate is above 3 for more than 5 minutes. Current value: {{ $value }}."
+            dashboard_url: "https://grafana.dymonyx.ru/d/chainwise-slo/chainwise-slo-overview"
+            runbook_url: "https://github.com/dymonyx/k8s-sre-observability/blob/main/runbooks/chainwise-availability-burn-rate.md"
+
+        - alert: ChainwiseLatencyHighPage
+          expr: |
+            chainwise:frontend_check:latency_seconds_avg5m > 1
+          for: 2m
+          labels:
+            severity: page
+            service: frontend
+            endpoint: /check
+            slo: latency
+          annotations:
+            summary: "Chainwise /check latency is critically high"
+            description: "Average successful frontend /check latency is above 1 second for more than 2 minutes. Current value: {{ $value }} seconds."
+            dashboard_url: "https://grafana.dymonyx.ru/d/chainwise-slo/chainwise-slo-overview"
+            runbook_url: "https://github.com/dymonyx/k8s-sre-observability/blob/main/runbooks/chainwise-high-latency.md"
+
+        - alert: ChainwiseLatencyHighTicket
+          expr: |
+            chainwise:frontend_check:latency_seconds_avg5m > 0.5
+          for: 5m
+          labels:
+            severity: ticket
+            service: frontend
+            endpoint: /check
+            slo: latency
+          annotations:
+            summary: "Chainwise /check latency is above the SLO target"
+            description: "Average successful frontend /check latency is above the 500 ms SLO target for more than 5 minutes. Current value: {{ $value }} seconds."
+            dashboard_url: "https://grafana.dymonyx.ru/d/chainwise-slo/chainwise-slo-overview"
+            runbook_url: "https://github.com/dymonyx/k8s-sre-observability/blob/main/runbooks/chainwise-high-latency.md"
