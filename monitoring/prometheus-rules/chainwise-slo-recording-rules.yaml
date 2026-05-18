@@ -1,0 +1,91 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: chainwise-slo-recording-rules
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: chainwise-slo-recording-rules
+    app.kubernetes.io/part-of: chainwise
+spec:
+  groups:
+    - name: chainwise.slo.recording
+      interval: 30s
+      rules:
+        - record: chainwise:frontend_check:request_rate5m
+          expr: |
+            sum(rate(chainwise_http_requests_total{
+              namespace="chainwise",
+              service="frontend",
+              path="/check"
+            }[5m]))
+          labels:
+            service: frontend
+            endpoint: /check
+            window: 5m
+
+        - record: chainwise:frontend_check:error_ratio_rate5m
+          expr: |
+            sum(rate(chainwise_http_requests_total{
+              namespace="chainwise",
+              service="frontend",
+              path="/check",
+              status=~"5.."
+            }[5m]))
+            /
+            clamp_min(
+              sum(rate(chainwise_http_requests_total{
+                namespace="chainwise",
+                service="frontend",
+                path="/check"
+              }[5m])),
+              0.000001
+            )
+          labels:
+            service: frontend
+            endpoint: /check
+            slo: availability
+            window: 5m
+
+        - record: chainwise:frontend_check:latency_seconds_avg5m
+          expr: |
+            sum(rate(chainwise_http_request_duration_seconds_sum{
+              namespace="chainwise",
+              service="frontend",
+              path="/check",
+              status!~"5.."
+            }[5m]))
+            /
+            clamp_min(
+              sum(rate(chainwise_http_requests_total{
+                namespace="chainwise",
+                service="frontend",
+                path="/check",
+                status!~"5.."
+              }[5m])),
+              0.000001
+            )
+          labels:
+            service: frontend
+            endpoint: /check
+            slo: latency
+            window: 5m
+
+        - record: chainwise:frontend_check:error_budget_ratio
+          expr: vector(0.005)
+          labels:
+            service: frontend
+            endpoint: /check
+            slo: availability
+            objective: "99.5"
+
+        - record: chainwise:frontend_check:burn_rate5m
+          expr: |
+            chainwise:frontend_check:error_ratio_rate5m
+            /
+            on(service, endpoint, slo) group_left(objective)
+            chainwise:frontend_check:error_budget_ratio
+          labels:
+            service: frontend
+            endpoint: /check
+            slo: availability
+            window: 5m
