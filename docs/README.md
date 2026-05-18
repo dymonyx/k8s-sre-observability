@@ -33,6 +33,7 @@ The Russian university report can be maintained separately. This README is inten
     - [Evidence](#evidence)
   - [12. Prometheus Scraping for Chainwise](#12-prometheus-scraping-for-chainwise)
   - [13. Grafana Service Overview Dashboard](#13-grafana-service-overview-dashboard)
+  - [14. Chainwise SLI/SLO Model](#14-chainwise-slislo-model)
 
 ---
 
@@ -942,3 +943,75 @@ Evidence screenshot:
 ```text
 reports/evidence/13-grafana-service-overview.png
 ```
+
+## 14. Chainwise SLI/SLO Model
+
+The user-centric SLI/SLO model for Chainwise is documented in:
+
+```text
+docs/sli-slo-model.md
+```
+
+This document defines the reliability model for the main Chainwise recommendation flow.
+
+The selected critical user journey is:
+
+```text
+A user opens the Chainwise frontend, requests a bicycle maintenance check, and receives a maintenance recommendation.
+```
+
+The primary endpoint for SLI/SLO measurement is:
+
+```text
+frontend /check
+```
+
+This endpoint was selected because it represents the complete user-facing recommendation flow and depends on the backend service chain:
+
+```text
+frontend /check
+  -> bike-api /bike/check
+    -> maintenance-api /maintenance/recommendation
+      -> weather-api /weather/risk
+        -> reminder-api /reminders/next
+          -> user-api /users/preferences
+```
+
+The request flow was verified using a shared `X-Request-ID`.
+
+Evidence for the frontend `/check` request and its propagation through the backend services was saved in:
+
+```text
+reports/evidence/14-check-request-flow-logs.txt
+```
+
+The saved evidence shows that a single request to `frontend /check` returned `200` and propagated through all Chainwise services with the same request ID:
+
+```text
+slo-test-1779098266
+```
+
+The SLI/SLO model defines:
+
+- availability SLI;
+- latency SLI;
+- availability SLO target;
+- latency SLO target;
+- availability error budget;
+- current metric limitations.
+
+The selected SLOs are:
+
+| SLO | Target | Window |
+|---|---:|---:|
+| Availability | 99.5% of `frontend /check` requests should not return `5xx` errors | 1 day |
+| Latency | Average successful `frontend /check` request duration should stay below 500 ms | normal operation |
+
+Current Chainwise metrics support availability and average latency calculation using:
+
+```text
+chainwise_http_requests_total
+chainwise_http_request_duration_seconds_sum
+```
+
+A percentile-based latency SLO, such as p95 or p99, is not used in this task because the current metrics do not expose histogram buckets.
