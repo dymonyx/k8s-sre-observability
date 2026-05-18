@@ -34,6 +34,7 @@ The Russian university report can be maintained separately. This README is inten
   - [12. Prometheus Scraping for Chainwise](#12-prometheus-scraping-for-chainwise)
   - [13. Grafana Service Overview Dashboard](#13-grafana-service-overview-dashboard)
   - [14. Chainwise SLI/SLO Model](#14-chainwise-slislo-model)
+  - [15. Prometheus Recording Rules for Chainwise SLO Inputs](#15-prometheus-recording-rules-for-chainwise-slo-inputs)
 
 ---
 
@@ -1015,3 +1016,97 @@ chainwise_http_request_duration_seconds_sum
 ```
 
 A percentile-based latency SLO, such as p95 or p99, is not used in this task because the current metrics do not expose histogram buckets.
+
+## 15. Prometheus Recording Rules for Chainwise SLO Inputs
+
+Prometheus recording rules were added to precompute the main SLI/SLO input signals for the Chainwise recommendation flow.
+
+The rules are stored in:
+
+```text
+monitoring/prometheus-rules/chainwise-slo-recording-rules.yaml
+```
+
+The rules are defined as a `PrometheusRule` resource in the `observability` namespace.
+
+The recording rules focus on the primary user-facing endpoint:
+
+```text
+frontend /check
+```
+
+This endpoint was selected in the SLI/SLO model because it represents the complete Chainwise recommendation flow.
+
+The following recording rules were added:
+
+| Recording rule | Purpose |
+|---|---|
+| `chainwise:frontend_check:request_rate5m` | Calculates request rate for `frontend /check` over 5 minutes |
+| `chainwise:frontend_check:error_ratio_rate5m` | Calculates the ratio of `5xx` responses to all `/check` responses |
+| `chainwise:frontend_check:latency_seconds_avg5m` | Calculates average successful `/check` request duration |
+| `chainwise:frontend_check:error_budget_ratio` | Stores the availability error budget ratio for the 99.5% SLO |
+| `chainwise:frontend_check:burn_rate5m` | Calculates current burn rate using `error_ratio / error_budget_ratio` |
+
+The availability SLO target is:
+
+```text
+99.5%
+```
+
+Therefore, the error budget ratio is:
+
+```text
+100% - 99.5% = 0.5% = 0.005
+```
+
+The burn rate rule is calculated as:
+
+```text
+burn rate = error ratio / error budget ratio
+```
+
+A burn rate of `1` means the service is consuming the error budget at the allowed rate. A burn rate greater than `1` means the service is consuming the error budget faster than allowed.
+
+The rules were applied with:
+
+```bash
+kubectl apply -f monitoring/prometheus-rules/chainwise-slo-recording-rules.yaml
+```
+
+The `PrometheusRule` resource was verified with:
+
+```bash
+kubectl -n observability get prometheusrule chainwise-slo-recording-rules
+```
+
+The recording rules were verified in Prometheus using the following query:
+
+```promql
+{__name__=~"chainwise:frontend_check:.*"}
+```
+
+The query returned all five expected recording rule series:
+
+```text
+chainwise:frontend_check:request_rate5m
+chainwise:frontend_check:error_ratio_rate5m
+chainwise:frontend_check:latency_seconds_avg5m
+chainwise:frontend_check:error_budget_ratio
+chainwise:frontend_check:burn_rate5m
+```
+
+The observed values confirmed that Prometheus successfully evaluated the rules:
+
+| Recording rule | Observed value | Meaning |
+|---|---:|---|
+| `chainwise:frontend_check:request_rate5m` | `0.1111111111111112` | `/check` request traffic was present |
+| `chainwise:frontend_check:error_ratio_rate5m` | `0` | No `5xx` errors were observed |
+| `chainwise:frontend_check:latency_seconds_avg5m` | `0.0625988` | Average successful `/check` latency was about 63 ms |
+| `chainwise:frontend_check:error_budget_ratio` | `0.005` | The 99.5% availability SLO gives a 0.5% error budget |
+| `chainwise:frontend_check:burn_rate5m` | `0` | No error budget was being consumed at verification time |
+
+Evidence screenshot was saved in:
+
+```text
+reports/evidence/15-prometheus-recording-rules.png
+```
