@@ -39,6 +39,7 @@ The Russian university report can be maintained separately. This README is inten
   - [17. Alertmanager Routing, Grouping, Silences and Inhibition](#17-alertmanager-routing-grouping-silences-and-inhibition)
   - [18. Grafana SLO Overview Dashboard](#18-grafana-slo-overview-dashboard)
   - [19. Incident Runbooks](#19-incident-runbooks)
+  - [Public Domain Access](#public-domain-access)
 
 ---
 
@@ -1483,3 +1484,136 @@ Each runbook includes:
 - follow-up actions.
 
 The runbooks are designed to support the incident validation tasks and the final project demo. During incident validation, the runbooks can be updated if the real mitigation or verification flow differs from the initial version.
+
+## Public Domain Access
+
+Public domain access was configured for the Chainwise application and Grafana dashboards.
+
+The final public URLs are:
+
+```text
+https://chainwise.dymonyx.ru
+https://grafana.dymonyx.ru
+https://grafana.dymonyx.ru/d/chainwise-slo/chainwise-slo-overview
+```
+
+DNS records were configured for:
+
+```text
+chainwise.dymonyx.ru
+grafana.dymonyx.ru
+```
+
+Both records point to the public IP of the Kubernetes worker node used as the external ingress entrypoint.
+
+The ingress node was labeled with:
+
+```bash
+kubectl label node worker-1 ingress=public
+```
+
+`ingress-nginx` was installed and configured as the public HTTP/HTTPS entrypoint:
+
+```text
+Ingress class: nginx
+Controller mode: DaemonSet
+Network mode: hostNetwork
+Node selector: ingress=public
+Service type: ClusterIP
+```
+
+The following public Ingress resources were added:
+
+```text
+deploy/k8s/chainwise-public-ingress.yaml
+monitoring/ingress/grafana-public-ingress.yaml
+```
+
+The Chainwise Ingress routes public traffic to:
+
+```text
+chainwise.dymonyx.ru -> frontend service -> port 8080
+```
+
+The Grafana Ingress routes public traffic to:
+
+```text
+grafana.dymonyx.ru -> kps-grafana service -> port 80
+```
+
+TLS certificates are managed by cert-manager using the `letsencrypt-prod` ClusterIssuer:
+
+```text
+infra/cert-manager/clusterissuer-letsencrypt-prod.yaml
+```
+
+Grafana was configured with the public root URL:
+
+```text
+https://grafana.dymonyx.ru/
+```
+
+The Chainwise Grafana dashboards are available through the public Grafana endpoint:
+
+```text
+https://grafana.dymonyx.ru
+```
+
+Dashboard JSON files are stored in:
+
+```text
+monitoring/dashboards/
+```
+
+The dashboards are provisioned into Grafana from Kubernetes ConfigMaps labeled with:
+
+```text
+grafana_dashboard=1
+```
+
+The following Chainwise dashboards are provisioned:
+
+| Dashboard | UID | Public URL |
+|---|---|---|
+| Chainwise Service Overview | `chainwise-service` | `https://grafana.dymonyx.ru/d/chainwise-service/chainwise-service-overview` |
+| Chainwise SLO Overview | `chainwise-slo` | `https://grafana.dymonyx.ru/d/chainwise-slo/chainwise-slo-overview` |
+
+The SLO dashboard URL matches the `dashboard_url` used in SLO alert annotations:
+
+```text
+https://grafana.dymonyx.ru/d/chainwise-slo/chainwise-slo-overview
+```
+
+Prometheus and Alertmanager are not exposed publicly. They remain accessible through local port-forwarding for debugging and validation.
+
+Verification commands:
+
+```bash
+dig +short chainwise.dymonyx.ru
+dig +short grafana.dymonyx.ru
+
+kubectl get ingressclass
+kubectl -n ingress-nginx get pods -o wide
+
+kubectl -n chainwise get ingress
+kubectl -n observability get ingress
+
+kubectl -n chainwise get certificate
+kubectl -n observability get certificate
+
+curl -I https://chainwise.dymonyx.ru
+curl -I https://grafana.dymonyx.ru
+```
+
+Dashboard provisioning can be checked with:
+
+```bash
+kubectl -n observability get configmap -l grafana_dashboard=1 | grep chainwise
+```
+
+Expected Chainwise dashboard ConfigMaps:
+
+```text
+chainwise-service-overview-dashboard
+chainwise-slo-overview-dashboard
+```
