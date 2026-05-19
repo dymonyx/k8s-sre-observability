@@ -10,7 +10,7 @@ The project uses **Chainwise**, a demo Go microservice application, as a target 
 
 The main goal is not only to run an application, but to demonstrate a complete SRE workflow around it:
 
-metrics → SLI/SLO → error budget → burn-rate alerts → Alertmanager → runbooks → incident response → postmortems
+metrics -> SLI/SLO -> error budget -> burn-rate alerts -> Alertmanager -> runbooks -> incident response -> postmortems
 
 ## Tech Stack
 
@@ -42,17 +42,17 @@ The user opens the frontend, enters bike usage data, and receives a maintenance 
 Request flow:
 
 Browser
-↓
+->
 frontend
-↓
+->
 bike-api
-↓
+->
 maintenance-api
-↓
+->
 weather-api
-↓
+->
 reminder-api
-↓
+->
 user-api
 
 ## Current Application Features
