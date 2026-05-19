@@ -21,6 +21,53 @@ prometheus:
         memory: 1Gi
 
 alertmanager:
+  config:
+    global:
+      resolve_timeout: 5m
+
+    route:
+      receiver: default-receiver
+      group_by:
+        - alertname
+        - service
+        - endpoint
+        - slo
+        - severity
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 2h
+      routes:
+        - receiver: page-receiver
+          matchers:
+            - severity="page"
+          continue: false
+
+        - receiver: ticket-receiver
+          matchers:
+            - severity="ticket"
+          continue: false
+
+        - receiver: null-receiver
+          matchers:
+            - alertname="Watchdog"
+          continue: false
+
+    inhibit_rules:
+      - source_matchers:
+          - severity="page"
+        target_matchers:
+          - severity="ticket"
+        equal:
+          - service
+          - endpoint
+          - slo
+
+    receivers:
+      - name: default-receiver
+      - name: page-receiver
+      - name: ticket-receiver
+      - name: null-receiver
+
   alertmanagerSpec:
     resources:
       requests:
