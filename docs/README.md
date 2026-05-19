@@ -38,6 +38,7 @@ The Russian university report can be maintained separately. This README is inten
   - [16. SLO-based Burn-rate Alerts](#16-slo-based-burn-rate-alerts)
   - [17. Alertmanager Routing, Grouping, Silences and Inhibition](#17-alertmanager-routing-grouping-silences-and-inhibition)
   - [18. Grafana SLO Overview Dashboard](#18-grafana-slo-overview-dashboard)
+  - [19. Incident Runbooks](#19-incident-runbooks)
 
 ---
 
@@ -1438,3 +1439,47 @@ Evidence screenshot was saved in:
 ```text
 reports/evidence/18-grafana-slo-overview-dashboard.png
 ```
+
+## 19. Incident Runbooks
+
+Runbooks were added for the main incident scenarios used in the Chainwise SRE project demo.
+
+The runbooks are stored in:
+
+```text
+runbooks/
+```
+
+The following runbooks were created:
+
+| Runbook | Purpose |
+|---|---|
+| `runbooks/chainwise-availability-burn-rate.md` | High error rate and availability error budget burn |
+| `runbooks/chainwise-high-latency.md` | High latency on the main recommendation flow |
+| `runbooks/kube-pod-not-ready.md` | Kubernetes pod readiness issues |
+
+The availability runbook is linked from the following alert annotations:
+
+```text
+ChainwiseAvailabilityBurnRatePage
+ChainwiseAvailabilityBurnRateTicket
+```
+
+The latency runbook is linked from the following alert annotations:
+
+```text
+ChainwiseLatencyHighPage
+ChainwiseLatencyHighTicket
+```
+
+Each runbook includes:
+
+- meaning;
+- impact;
+- quick triage commands;
+- demo failure mode;
+- mitigation steps;
+- verification steps;
+- follow-up actions.
+
+The runbooks are designed to support the incident validation tasks and the final project demo. During incident validation, the runbooks can be updated if the real mitigation or verification flow differs from the initial version.
