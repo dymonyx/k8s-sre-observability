@@ -36,6 +36,7 @@ The Russian university report can be maintained separately. This README is inten
   - [14. Chainwise SLI/SLO Model](#14-chainwise-slislo-model)
   - [15. Prometheus Recording Rules for Chainwise SLO Inputs](#15-prometheus-recording-rules-for-chainwise-slo-inputs)
   - [16. SLO-based Burn-rate Alerts](#16-slo-based-burn-rate-alerts)
+  - [17. Alertmanager Routing, Grouping, Silences and Inhibition](#17-alertmanager-routing-grouping-silences-and-inhibition)
 
 ---
 
@@ -1236,4 +1237,132 @@ Evidence screenshot was saved in:
 
 ```text
 reports/evidence/16-availability-alert-firing-prometheus.png
+```
+
+## 17. Alertmanager Routing, Grouping, Silences and Inhibition
+
+Alertmanager was configured to handle Chainwise SLO alerts by severity.
+
+The configuration is stored in:
+
+```text
+monitoring/kube-prometheus-stack/values.yaml
+```
+
+Alertmanager is installed as part of `kube-prometheus-stack`. This task does not install a new Alertmanager instance. It updates the existing Alertmanager configuration.
+
+The routing configuration sends alerts to different receivers based on the `severity` label:
+
+| Severity | Receiver | Purpose |
+|---|---|---|
+| `page` | `page-receiver` | Urgent alerts that require immediate attention |
+| `ticket` | `ticket-receiver` | Non-urgent alerts that should be investigated but do not require immediate paging |
+| `none` / `Watchdog` | `null-receiver` | Internal always-firing Watchdog alert, ignored for this demo |
+
+The main routing logic is:
+
+```text
+severity="page" -> page-receiver
+severity="ticket" -> ticket-receiver
+alertname="Watchdog" -> null-receiver
+```
+
+Alert grouping was configured with:
+
+```text
+group_by:
+  - alertname
+  - service
+  - endpoint
+  - slo
+  - severity
+```
+
+The grouping timings are:
+
+| Setting | Value | Meaning |
+|---|---:|---|
+| `group_wait` | `30s` | Wait briefly before sending a new alert group |
+| `group_interval` | `5m` | Minimum time before sending updates for an existing group |
+| `repeat_interval` | `2h` | Repeat active alert notifications every 2 hours |
+| `resolve_timeout` | `5m` | Mark alerts resolved if they stop being updated |
+
+An inhibition rule was added to reduce alert noise:
+
+```text
+If a page alert is firing,
+suppress ticket alerts
+with the same service, endpoint and SLO.
+```
+
+This means that when both page and ticket alerts fire for the same Chainwise SLO, the less urgent ticket alert is inhibited while the page alert remains active.
+
+The inhibition rule matches alerts using:
+
+```text
+service
+endpoint
+slo
+```
+
+A manual example silence was created in the Alertmanager UI for the ticket-level latency alert:
+
+```text
+alertname="ChainwiseLatencyHighTicket"
+severity="ticket"
+```
+
+This verifies that Alertmanager silences can be used to temporarily mute a known or expected alert.
+
+Alertmanager routing, grouping and inhibition were verified in the Alertmanager UI after triggering controlled latency degradation in `bike-api`.
+
+Latency degradation was enabled with:
+
+```bash
+kubectl -n chainwise set env deploy/bike-api DEMO_LATENCY_MS=1200 DEMO_FAIL_RATE=0
+kubectl -n chainwise rollout status deploy/bike-api
+```
+
+The frontend service was exposed locally during the test with:
+
+```bash
+kubectl -n chainwise port-forward svc/frontend 8080:8080
+```
+
+Traffic was generated against the main user-facing endpoint:
+
+```bash
+while true; do
+  curl -s http://localhost:8080/check > /dev/null
+  sleep 1
+done
+```
+
+This caused the average latency recording rule to increase:
+
+```promql
+chainwise:frontend_check:latency_seconds_avg5m
+```
+
+As a result, the latency SLO alerts fired:
+
+```text
+ChainwiseLatencyHighPage
+ChainwiseLatencyHighTicket
+```
+
+Alertmanager routed the alerts based on their `severity` labels and applied the configured inhibition rule for the ticket-level alert when the page-level alert was active.
+
+Evidence screenshots were saved in:
+
+```text
+reports/evidence/17-alertmanager-ui-routing-inhibition.png
+reports/evidence/17-alertmanager-example-silence.png
+```
+
+After verification, the traffic loop was stopped and the demo degradation was disabled:
+
+```bash
+kubectl -n chainwise set env deploy/bike-api DEMO_LATENCY_MS=0 DEMO_FAIL_RATE=0
+kubectl -n chainwise rollout status deploy/bike-api
 ```
