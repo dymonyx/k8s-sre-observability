@@ -78,6 +78,10 @@ alertmanager:
         memory: 128Mi
 
 grafana:
+  grafana.ini:
+    server:
+      domain: grafana.dymonyx.ru
+      root_url: https://grafana.dymonyx.ru/
   resources:
     requests:
       cpu: 100m
