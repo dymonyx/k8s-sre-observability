@@ -500,10 +500,11 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "up{namespace=\"chainwise\", service=~\"$service\"}",
+          "expr": "max by (service) (\n  up{namespace=\"chainwise\", service=~\"$service\"}\n)",
           "legendFormat": "{{service}}",
-          "range": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "Chainwise target health",
