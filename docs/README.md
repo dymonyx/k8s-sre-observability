@@ -37,6 +37,7 @@ The Russian university report can be maintained separately. This README is inten
   - [15. Prometheus Recording Rules for Chainwise SLO Inputs](#15-prometheus-recording-rules-for-chainwise-slo-inputs)
   - [16. SLO-based Burn-rate Alerts](#16-slo-based-burn-rate-alerts)
   - [17. Alertmanager Routing, Grouping, Silences and Inhibition](#17-alertmanager-routing-grouping-silences-and-inhibition)
+  - [18. Grafana SLO Overview Dashboard](#18-grafana-slo-overview-dashboard)
 
 ---
 
@@ -1365,4 +1366,75 @@ After verification, the traffic loop was stopped and the demo degradation was di
 ```bash
 kubectl -n chainwise set env deploy/bike-api DEMO_LATENCY_MS=0 DEMO_FAIL_RATE=0
 kubectl -n chainwise rollout status deploy/bike-api
+```
+
+## 18. Grafana SLO Overview Dashboard
+
+A Grafana dashboard was created to visualize the SLO status of the main Chainwise recommendation flow.
+
+The dashboard JSON was exported to the repository:
+
+```text
+monitoring/dashboards/chainwise-slo-overview.json
+```
+
+The dashboard title is:
+
+```text
+Chainwise SLO Overview
+```
+
+The dashboard UID is fixed as:
+
+```text
+chainwise-slo
+```
+
+This matches the planned dashboard URL used in SLO alert annotations:
+
+```text
+https://grafana.dymonyx.ru/d/chainwise-slo/chainwise-slo-overview
+```
+
+During local verification, the dashboard was accessed through Grafana port-forwarding:
+
+```bash
+kubectl -n observability port-forward svc/kps-grafana 3000:80
+```
+
+The local dashboard URL was:
+
+```text
+http://localhost:3000/d/chainwise-slo/chainwise-slo-overview
+```
+
+The dashboard uses the SLO recording rules created earlier:
+
+```text
+chainwise:frontend_check:error_ratio_rate5m
+chainwise:frontend_check:latency_seconds_avg5m
+chainwise:frontend_check:error_budget_ratio
+chainwise:frontend_check:burn_rate5m
+```
+
+The following panels were added:
+
+| Panel | Purpose |
+|---|---|
+| Availability SLI | Shows current availability for `frontend /check` |
+| Latency SLI | Shows current average successful `/check` latency |
+| Availability Error Budget | Shows the configured 0.5% error budget for the 99.5% availability SLO |
+| Availability Burn Rate | Shows current availability burn rate |
+| Availability SLI Over Time | Shows availability changes over time |
+| Latency SLI Over Time | Shows latency changes over time |
+| Error Ratio vs Error Budget | Compares current error ratio with the allowed error budget ratio |
+| Burn Rate Over Time | Shows burn-rate changes over time |
+| Active Chainwise SLO Alerts | Shows currently firing Chainwise SLO alerts |
+
+The dashboard was verified during and after previous controlled degradation tests. The graphs show SLO behavior during degradation, including increased latency, increased error ratio, and increased burn rate. After the degradation was disabled, the dashboard returned to a healthy state.
+
+Evidence screenshot was saved in:
+
+```text
+reports/evidence/18-grafana-slo-overview-dashboard.png
 ```
