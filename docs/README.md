@@ -40,6 +40,7 @@ The Russian university report can be maintained separately. This README is inten
   - [18. Grafana SLO Overview Dashboard](#18-grafana-slo-overview-dashboard)
   - [19. Incident Runbooks](#19-incident-runbooks)
   - [Public Domain Access](#public-domain-access)
+  - [20. k6 Load Tests for Reproducible Traffic](#20-k6-load-tests-for-reproducible-traffic)
 
 ---
 
@@ -1617,3 +1618,144 @@ Expected Chainwise dashboard ConfigMaps:
 chainwise-service-overview-dashboard
 chainwise-slo-overview-dashboard
 ```
+
+## 20. k6 Load Tests for Reproducible Traffic
+
+A k6 load test script was added to generate normal traffic and support reproducible Chainwise incident scenarios.
+
+The script is stored in:
+
+```text
+load/k6-check.js
+```
+
+The script sends traffic to the main user-facing endpoint:
+
+```text
+GET /check
+```
+
+This endpoint represents the Chainwise recommendation flow and is the primary endpoint used by the SLI/SLO model.
+
+The k6 script supports different scenarios through environment variables:
+
+| Variable | Purpose | Example |
+|---|---|---|
+| `BASE_URL` | Target Chainwise frontend URL | `https://chainwise.dymonyx.ru` |
+| `SCENARIO` | Scenario label for the test run | `normal`, `error`, `latency` |
+| `DURATION` | Test duration | `5m`, `7m` |
+| `VUS` | Number of virtual users | `3` |
+| `SLEEP` | Delay between requests per virtual user | `1` |
+
+Normal traffic can be generated with:
+
+```bash
+BASE_URL=https://chainwise.dymonyx.ru \
+SCENARIO=normal \
+DURATION=5m \
+VUS=3 \
+SLEEP=1 \
+k6 run load/k6-check.js
+```
+
+For local testing through port-forwarding:
+
+```bash
+kubectl -n chainwise port-forward svc/frontend 8080:8080
+```
+
+```bash
+BASE_URL=http://localhost:8080 \
+SCENARIO=normal \
+DURATION=5m \
+VUS=3 \
+SLEEP=1 \
+k6 run load/k6-check.js
+```
+
+The error scenario is supported by enabling controlled failures in `bike-api` before running k6:
+
+```bash
+kubectl -n chainwise set env deploy/bike-api DEMO_FAIL_RATE=0.1 DEMO_LATENCY_MS=0
+kubectl -n chainwise rollout status deploy/bike-api
+```
+
+Then traffic can be generated with:
+
+```bash
+BASE_URL=https://chainwise.dymonyx.ru \
+SCENARIO=error \
+DURATION=7m \
+VUS=3 \
+SLEEP=1 \
+k6 run load/k6-check.js
+```
+
+The latency scenario is supported by enabling controlled latency in `bike-api` before running k6:
+
+```bash
+kubectl -n chainwise set env deploy/bike-api DEMO_LATENCY_MS=1200 DEMO_FAIL_RATE=0
+kubectl -n chainwise rollout status deploy/bike-api
+```
+
+Then traffic can be generated with:
+
+```bash
+BASE_URL=https://chainwise.dymonyx.ru \
+SCENARIO=latency \
+DURATION=7m \
+VUS=3 \
+SLEEP=1 \
+k6 run load/k6-check.js
+```
+
+After degraded scenarios, the application should be returned to normal:
+
+```bash
+kubectl -n chainwise set env deploy/bike-api DEMO_FAIL_RATE=0 DEMO_LATENCY_MS=0
+kubectl -n chainwise rollout status deploy/bike-api
+```
+
+The k6 script records custom metrics for check failures and request duration:
+
+```text
+chainwise_check_errors
+chainwise_check_duration_ms
+```
+
+Traffic generation was verified through the Chainwise Service Overview Grafana dashboard. The dashboard showed increased request rate and HTTP request activity after running the k6 normal scenario.
+
+The same traffic can also be verified in Prometheus with:
+
+```promql
+chainwise:frontend_check:request_rate5m
+```
+
+Additional verification queries:
+
+```promql
+chainwise:frontend_check:error_ratio_rate5m
+```
+
+```promql
+chainwise:frontend_check:latency_seconds_avg5m
+```
+
+```promql
+sum by (service, path, status) (
+  rate(chainwise_http_requests_total{
+    namespace="chainwise",
+    service="frontend",
+    path="/check"
+  }[5m])
+)
+```
+
+Evidence screenshots were saved in:
+
+```text
+reports/evidence/20-k6-normal-traffic.png
+reports/evidence/20-grafana-k6-traffic.png
+```
+
+These k6 scenarios will be used by the high 5xx and high latency incident validation tasks.
